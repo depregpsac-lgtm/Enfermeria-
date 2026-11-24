@@ -1,0 +1,3288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Enfermería Escolar</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+body { background: #f0f4f8; color: #2c3e50; }
+
+/* HEADER */
+.header { background: linear-gradient(135deg, #1e88e5, #0d47a1); color: white; padding: 15px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+.header h1 { font-size: 24px; display: flex; align-items: center; gap: 10px; }
+.header .fecha { font-size: 14px; opacity: 0.9; }
+
+/* NAV */
+.nav { background: white; padding: 0 30px; display: flex; gap: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow-x: auto; }
+.nav button { background: none; border: none; padding: 15px 20px; cursor: pointer; font-size: 14px; font-weight: 500; color: #666; border-bottom: 3px solid transparent; transition: all 0.3s; white-space: nowrap; }
+.nav button:hover { color: #1e88e5; background: #f5f9ff; }
+.nav button.active { color: #1e88e5; border-bottom-color: #1e88e5; }
+
+/* CONTENIDO */
+.container { padding: 25px 30px; max-width: 1400px; margin: 0 auto; }
+.seccion { display: none; }
+.seccion.activa { display: block; animation: fadeIn 0.3s; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* TARJETAS DASHBOARD */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 25px; }
+.stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 4px solid #1e88e5; }
+.stat-card.verde { border-left-color: #43a047; }
+.stat-card.naranja { border-left-color: #fb8c00; }
+.stat-card.rojo { border-left-color: #e53935; }
+.stat-card.purpura { border-left-color: #8e24aa; }
+.stat-card h3 { font-size: 13px; color: #888; text-transform: uppercase; margin-bottom: 8px; }
+.stat-card .valor { font-size: 28px; font-weight: bold; color: #2c3e50; }
+.stat-card .sub { font-size: 12px; color: #999; margin-top: 5px; }
+
+/* PANELES */
+.panel { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.panel h2 { color: #1e88e5; margin-bottom: 15px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+.panel h3 { color: #2c3e50; margin: 15px 0 10px; font-size: 16px; }
+
+/* FORMULARIOS */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; }
+.form-group { display: flex; flex-direction: column; }
+.form-group label { font-size: 13px; color: #555; margin-bottom: 5px; font-weight: 500; }
+.form-group input, .form-group select, .form-group textarea { padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; transition: border 0.3s; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #1e88e5; box-shadow: 0 0 0 3px rgba(30,136,229,0.1); }
+.form-group textarea { resize: vertical; min-height: 70px; }
+
+/* BOTONES */
+.btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: #1e88e5; color: white; }
+.btn-primary:hover { background: #1565c0; }
+.btn-success { background: #43a047; color: white; }
+.btn-success:hover { background: #2e7d32; }
+.btn-warning { background: #fb8c00; color: white; }
+.btn-warning:hover { background: #ef6c00; }
+.btn-danger { background: #e53935; color: white; }
+.btn-danger:hover { background: #c62828; }
+.btn-secondary { background: #607d8b; color: white; }
+.btn-secondary:hover { background: #455a64; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+
+/* TABLAS */
+.tabla-container { overflow-x: auto; margin-top: 15px; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #1e88e5; color: white; padding: 12px; text-align: left; font-size: 13px; font-weight: 500; }
+td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 13px; }
+tr:hover { background: #f5f9ff; }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+.badge-azul { background: #e3f2fd; color: #1565c0; }
+.badge-verde { background: #e8f5e9; color: #2e7d32; }
+.badge-rojo { background: #ffebee; color: #c62828; }
+.badge-naranja { background: #fff3e0; color: #ef6c00; }
+
+/* BUSCADOR */
+.buscador { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+.buscador input, .buscador select { flex: 1; min-width: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+
+/* MEDICAMENTOS */
+.med-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
+.med-card { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; transition: all 0.3s; }
+.med-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.med-card h4 { color: #1e88e5; font-size: 15px; margin-bottom: 10px; }
+.med-info { display: flex; justify-content: space-between; margin: 8px 0; font-size: 13px; }
+.med-info strong { color: #2c3e50; }
+.barra { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+.barra-fill { height: 100%; background: linear-gradient(90deg, #43a047, #66bb6a); transition: width 0.5s; }
+.barra-fill.bajo { background: linear-gradient(90deg, #e53935, #ef5350); }
+.barra-fill.medio { background: linear-gradient(90deg, #fb8c00, #ffa726); }
+
+/* MODAL */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+.modal-overlay.activo { display: flex; }
+.modal { background: white; border-radius: 12px; padding: 25px; max-width: 700px; width: 100%; max-height: 90vh; overflow-y: auto; }
+.modal h2 { color: #1e88e5; margin-bottom: 20px; }
+.modal-close { float: right; background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+
+/* ALERTAS */
+.alerta { padding: 12px 15px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; }
+.alerta-info { background: #e3f2fd; color: #1565c0; border-left: 4px solid #1e88e5; }
+.alerta-warning { background: #fff3e0; color: #ef6c00; border-left: 4px solid #fb8c00; }
+.alerta-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #43a047; }
+
+/* SIGNOS VITALES */
+.signos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.signo-item { background: #f5f9ff; padding: 12px; border-radius: 8px; text-align: center; }
+.signo-item .label { font-size: 11px; color: #666; text-transform: uppercase; }
+.signo-item .valor { font-size: 20px; font-weight: bold; color: #1e88e5; margin-top: 5px; }
+
+/* TABS INTERNAS */
+.tabs-internas { display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 2px solid #eee; }
+.tab-interna { padding: 10px 15px; background: none; border: none; cursor: pointer; color: #666; font-size: 14px; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+.tab-interna.activa { color: #1e88e5; border-bottom-color: #1e88e5; }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .header { flex-direction: column; gap: 10px; text-align: center; }
+  .container { padding: 15px; }
+  .nav { padding: 0 10px; }
+  .nav button { padding: 12px 15px; font-size: 13px; }
+}
+
+/* HISTORIAL */
+.historial-item { background: #f9f9f9; padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #1e88e5; }
+.historial-item .fecha { font-size: 12px; color: #888; }
+.historial-item .contenido { margin-top: 5px; font-size: 14px; }
+
+/* PRINT */
+@page { size: letter portrait; margin: 4mm; }
+.encabezado-reporte {
+  display: grid;
+  grid-template-columns: 110px 1fr 110px;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 10px 12px 14px;
+  border-bottom: 3px solid #1e88e5;
+}
+.encabezado-reporte img {
+  width: 100%;
+  max-height: 82px;
+  object-fit: contain;
+}
+.encabezado-reporte img.logo-salesiano {
+  max-height: 108px;
+}
+.encabezado-reporte .titulo-reporte {
+  text-align: center;
+  min-width: 0;
+}
+.encabezado-reporte .titulo-reporte strong {
+  display: block;
+  color: #1e88e5;
+  font-size: 18px;
+  line-height: 1.25;
+}
+.encabezado-reporte .titulo-reporte span {
+  display: block;
+  margin-top: 5px;
+  color: #455a64;
+  font-size: 13px;
+  font-weight: 600;
+}
+#contenidoReporte .reporte-titulo {
+  text-align: center;
+  color: #263238;
+  margin: 4px 0 10px;
+  padding: 0;
+  font-size: 17px;
+}
+#contenidoReporte table {
+  margin-top: 8px;
+  border: 1px solid #cfd8dc;
+  font-size: 12px;
+}
+#contenidoReporte th,
+#contenidoReporte td {
+  border: 1px solid #cfd8dc;
+  vertical-align: top;
+}
+#contenidoReporte > table th {
+  background: #1e88e5;
+  color: #fff;
+  text-align: center;
+}
+#contenidoReporte .reporte-datos th {
+  width: 32%;
+  background: #eaf3fb;
+  color: #263238;
+  text-align: left;
+}
+.pie-reporte {
+  margin-top: 24px;
+  padding-top: 8px;
+  border-top: 1px solid #b0bec5;
+  text-align: right;
+  color: #607d8b;
+  font-size: 11px;
+}
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #0d47a1, #1e88e5);
+}
+.login-card {
+  width: min(420px, 100%);
+  background: white;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+}
+.login-card h2 { color: #1e88e5; margin-bottom: 8px; }
+.login-card .logo-login { display: block; width: 110px; height: 110px; object-fit: contain; margin: 0 auto 12px; }
+.login-error { display: none; color: #c62828; background: #ffebee; padding: 10px; border-radius: 8px; margin-top: 12px; }
+.usuario-actual { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.usuario-actual strong { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.estado-supabase {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #dfeeff;
+}
+.estado-supabase::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffc107;
+}
+.estado-supabase.conectado::before { background: #69f0ae; }
+.estado-supabase.desconectado::before { background: #ff8a80; }
+.permisos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.permiso-fila { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; background: #f5f9ff; border-radius: 8px; padding: 10px 12px; }
+.permiso-fila label { color: #455a64; font-size: 13px; }
+.permiso-opcion { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.usuario-permisos { font-size: 12px; color: #607d8b; }
+.historial-item {
+  break-inside: avoid;
+}
+@media print {
+  body * { visibility: hidden !important; }
+  html, body { height: auto !important; }
+  #reportes.seccion { display: block !important; }
+  #panelReporte, #panelReporte * { visibility: visible !important; }
+  #panelReporte {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+  #panelReporte > h2 { display: none; }
+  #contenidoReporte {
+    display: flex;
+    flex-direction: column;
+    min-height: 256mm;
+    color: #000;
+  }
+  #contenidoReporte table { font-size: 11pt; margin-top: 5px; }
+  #contenidoReporte th, #contenidoReporte td { padding: 6px 7px; }
+  #contenidoReporte table { page-break-inside: auto; }
+  #contenidoReporte tr { page-break-inside: avoid; }
+  #contenidoReporte h4 { margin: 10px 0 7px !important; font-size: 12pt; }
+  #contenidoReporte p { margin: 5px 0; font-size: 11pt; }
+  #contenidoReporte .historial-item {
+    padding: 9px 11px;
+    margin-bottom: 6px;
+    font-size: 10.5pt;
+    page-break-inside: avoid;
+  }
+  #contenidoReporte .historial-item .fecha { font-size: 10.5pt; }
+  #contenidoReporte .historial-item div { margin-top: 4px !important; }
+  #contenidoReporte .reporte-titulo { margin: 5px 0 7px; font-size: 16pt; }
+  #contenidoReporte .pie-reporte {
+    margin-top: auto;
+  }
+  .encabezado-reporte {
+    grid-template-columns: 105px 1fr 120px;
+    gap: 14px;
+    margin-bottom: 10px;
+    padding: 6px 8px 10px;
+  }
+  .encabezado-reporte img { max-height: 76px; }
+  .encabezado-reporte img.logo-salesiano { max-height: 96px; }
+  .encabezado-reporte .titulo-reporte strong { font-size: 16pt; }
+  .encabezado-reporte .titulo-reporte span { margin-top: 5px; font-size: 11pt; }
+  .pie-reporte { margin-top: 10px; padding-top: 6px; font-size: 10pt; }
+}
+</style>
+</head>
+<body>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <img src="img/logo_enfermeria.png" alt="Logo" class="logo-login">
+    <h2>Acceso al Sistema</h2>
+    <p style="color:#607d8b; margin-bottom:18px;">Sistema de Enfermería Escolar</p>
+    <form id="formLogin" onsubmit="iniciarSesion(event)">
+      <div class="form-group">
+        <label for="loginCorreo">Correo electrónico</label>
+        <input type="email" id="loginCorreo" autocomplete="username" required>
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label for="loginClave">Contraseña</label>
+        <input type="password" id="loginClave" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:16px;">Iniciar sesión</button>
+      <div class="login-error" id="loginError">Correo o contraseña incorrectos.</div>
+    </form>
+  </div>
+</div>
+
+<div class="header">
+  <h1>🏥 Sistema de Enfermería Escolar</h1>
+  <div class="usuario-actual">
+    <div>
+      <div class="fecha" id="fechaActual"></div>
+      <strong id="usuarioActual"></strong>
+      <div class="estado-supabase" id="estadoSupabase">Supabase: verificando...</div>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cerrarSesion()">Cerrar sesión</button>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="active" onclick="mostrarSeccion('dashboard', this)">📊 Dashboard</button>
+  <button onclick="mostrarSeccion('estudiantes', this)">👨‍🎓 Estudiantes</button>
+  <button onclick="mostrarSeccion('personal', this)">👥 Personal</button>
+  <button onclick="mostrarSeccion('medicamentos', this)">💊 Medicamentos</button>
+  <button onclick="mostrarSeccion('atenciones', this)">📋 Atenciones</button>
+  <button onclick="mostrarSeccion('reportes', this)">📈 Reportes</button>
+  <button id="navUsuarios" onclick="mostrarSeccion('usuarios', this)">👤 Usuarios</button>
+  <button onclick="mostrarSeccion('configuracion', this)">⚙️ Configuración</button>
+</div>
+
+<div class="container">
+
+  <!-- DASHBOARD -->
+  <div class="seccion activa" id="dashboard">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>Estudiantes Registrados</h3>
+        <div class="valor" id="totalEstudiantes">0</div>
+        <div class="sub">Total en sistema</div>
+      </div>
+      <div class="stat-card verde">
+        <h3>Personal Registrado</h3>
+        <div class="valor" id="totalPersonal">0</div>
+        <div class="sub">Docentes, admin y apoyo</div>
+      </div>
+      <div class="stat-card naranja">
+        <h3>Atenciones Hoy</h3>
+        <div class="valor" id="atencionesHoy">0</div>
+        <div class="sub" id="fechaHoy"></div>
+      </div>
+      <div class="stat-card rojo">
+        <h3>Medicamentos Bajos</h3>
+        <div class="valor" id="medsBajos">0</div>
+        <div class="sub">Requieren reposición</div>
+      </div>
+      <div class="stat-card purpura">
+        <h3>Total Atenciones</h3>
+        <div class="valor" id="totalAtenciones">0</div>
+        <div class="sub">Histórico general</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>📌 Resumen del Día</h2>
+      <div id="resumenDia">
+        <div class="alerta alerta-info">Bienvenido al sistema de enfermería. Seleccione una sección del menú para comenzar.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>🕐 Últimas Atenciones</h2>
+      <div id="ultimasAtenciones">
+        <p style="color:#999; text-align:center; padding:20px;">No hay atenciones registradas aún</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ESTUDIANTES -->
+  <div class="seccion" id="estudiantes">
+    <div class="panel">
+      <h2>📥 Carga Masiva de Estudiantes</h2>
+      <p style="font-size:13px; color:#666; margin-bottom:12px;">Descargue la plantilla, complete el listado y luego cargue el archivo CSV.</p>
+      <div class="btn-group" style="margin-top:0;">
+        <button type="button" class="btn btn-secondary" onclick="descargarPlantillaEstudiantes()">⬇️ Descargar plantilla</button>
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('archivoEstudiantes').click()">📂 Cargar listado CSV</button>
+        <input type="file" id="archivoEstudiantes" accept=".csv,text/csv" style="display:none;" onchange="importarEstudiantes(event)">
+      </div>
+    </div>
+    <div class="panel">
+      <h2>➕ Registrar Nuevo Estudiante</h2>
+      <form id="formEstudiante" onsubmit="guardarEstudiante(event)" onreset="cancelarEdicionEstudiante()">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nombre Completo *</label>
+            <input type="text" id="est_nombre" required>
+          </div>
+          <div class="form-group">
+            <label>Edad *</label>
+            <input type="number" id="est_edad" min="3" max="20" required>
+          </div>
+          <div class="form-group">
+            <label>Sexo *</label>
+            <select id="est_sexo" required>
+              <option value="">Seleccionar</option>
+              <option value="Masculino">Masculino</option>
+              <option value="Femenino">Femenino</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Curso *</label>
+            <input type="text" id="est_curso" placeholder="Ej: 5to Grado A" required>
+          </div>
+          <div class="form-group">
+            <label>Maestro/a</label>
+            <input type="text" id="est_maestro">
+          </div>
+          <div class="form-group">
+            <label>Nombre del Responsable (Padre/Madre)</label>
+            <input type="text" id="est_responsable">
+          </div>
+          <div class="form-group">
+            <label>Teléfono de Contacto</label>
+            <input type="tel" id="est_telefono">
+          </div>
+          <div class="form-group">
+            <label>Alergias Conocidas</label>
+            <input type="text" id="est_alergias" placeholder="Ej: Penicilina, Ninguna">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:15px;">
+          <label>Observaciones Médicas / Antecedentes</label>
+          <textarea id="est_observaciones" placeholder="Condiciones médicas, enfermedades crónicas, etc."></textarea>
+        </div>
+        <div class="btn-group">
+          <button type="submit" class="btn btn-primary">💾 Guardar Estudiante</button>
+          <button type="reset" class="btn btn-secondary">🔄 Limpiar</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>📋 Lista de Estudiantes</h2>
+      <div class="buscador">
+        <input type="text" id="buscarEstudiante" placeholder="🔍 Buscar por nombre, curso o maestro..." oninput="filtrarEstudiantes()">
+        <select id="filtroCurso" onchange="filtrarEstudiantes()">
+          <option value="">Todos los cursos</option>
+        </select>
+      </div>
+      <div class="tabla-container">
+        <table id="tablaEstudiantes">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Edad</th>
+              <th>Sexo</th>
+              <th>Curso</th>
+              <th>Maestro</th>
+              <th>Alergias</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpoEstudiantes"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PERSONAL -->
+  <div class="seccion" id="personal">
+    <div class="panel">
+      <h2>📥 Carga Masiva de Personal</h2>
+      <p style="font-size:13px; color:#666; margin-bottom:12px;">Descargue la plantilla, complete el listado y luego cargue el archivo CSV.</p>
+      <div class="btn-group" style="margin-top:0;">
+        <button type="button" class="btn btn-secondary" onclick="descargarPlantillaPersonal()">⬇️ Descargar plantilla</button>
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('archivoPersonal').click()">📂 Cargar listado CSV</button>
+        <input type="file" id="archivoPersonal" accept=".csv,text/csv" style="display:none;" onchange="importarPersonal(event)">
+      </div>
+    </div>
+    <div class="panel">
+      <h2>➕ Registrar Personal</h2>
+      <form id="formPersonal" onsubmit="guardarPersonal(event)" onreset="cancelarEdicionPersonal()">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nombre Completo *</label>
+            <input type="text" id="per_nombre" required>
+          </div>
+          <div class="form-group">
+            <label>Tipo de Personal *</label>
+            <select id="per_tipo" required>
+              <option value="">Seleccionar</option>
+              <option value="Docente">Docente</option>
+              <option value="Administrativo">Administrativo</option>
+              <option value="Apoyo">Apoyo</option>
+              <option value="Directivo">Directivo</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Cargo / Puesto</label>
+            <input type="text" id="per_cargo">
+          </div>
+          <div class="form-group">
+            <label>Área / Departamento</label>
+            <input type="text" id="per_area">
+          </div>
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="tel" id="per_telefono">
+          </div>
+          <div class="form-group">
+            <label>Alergias Conocidas</label>
+            <input type="text" id="per_alergias">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:15px;">
+          <label>Observaciones Médicas</label>
+          <textarea id="per_observaciones"></textarea>
+        </div>
+        <div class="btn-group">
+          <button type="submit" class="btn btn-primary">💾 Guardar Personal</button>
+          <button type="reset" class="btn btn-secondary">🔄 Limpiar</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>📋 Lista de Personal</h2>
+      <div class="buscador">
+        <input type="text" id="buscarPersonal" placeholder="🔍 Buscar por nombre, tipo o cargo..." oninput="filtrarPersonal()">
+        <select id="filtroTipo" onchange="filtrarPersonal()">
+          <option value="">Todos los tipos</option>
+          <option value="Docente">Docente</option>
+          <option value="Administrativo">Administrativo</option>
+          <option value="Apoyo">Apoyo</option>
+          <option value="Directivo">Directivo</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="tabla-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Tipo</th>
+              <th>Cargo</th>
+              <th>Área</th>
+              <th>Teléfono</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpoPersonal"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MEDICAMENTOS -->
+  <div class="seccion" id="medicamentos">
+    <div class="alerta alerta-info">
+      💊 <strong>Lógica de consumo diario:</strong> Por defecto se asignan 5 unidades de cada medicamento por día, excepto Acetaminofén/Paracetamol que son 10. Los medicamentos no consumidos se acumulan para el día siguiente.
+    </div>
+
+    <div class="panel">
+      <h2>💊 Inventario de Medicamentos</h2>
+      <div class="btn-group" style="margin-bottom:15px;">
+        <button class="btn btn-primary" onclick="abrirModalMedicamento()">➕ Agregar Medicamento</button>
+        <button class="btn btn-success" onclick="abrirModalReposicion()">📦 Registrar Reposición</button>
+        <button class="btn btn-warning" onclick="resetearConsumoDiario()">🔄 Resetear Consumo del Día</button>
+        <button class="btn btn-secondary" onclick="verHistorialConsumo()">📊 Ver Historial de Consumo</button>
+      </div>
+      <div class="med-grid" id="gridMedicamentos"></div>
+    </div>
+
+    <div class="panel">
+      <h2>📊 Consumo del Día</h2>
+      <div id="consumoDiario"></div>
+    </div>
+  </div>
+
+  <!-- ATENCIONES -->
+  <div class="seccion" id="atenciones">
+    <div class="panel">
+      <h2>🩺 Nueva Atención</h2>
+      <div class="tabs-internas">
+        <button class="tab-interna activa" onclick="cambiarTipoAtencion('estudiante', this)">Estudiante</button>
+        <button class="tab-interna" onclick="cambiarTipoAtencion('personal', this)">Personal</button>
+      </div>
+
+      <form id="formAtencion" onsubmit="guardarAtencion(event)">
+        <input type="hidden" id="at_tipo" value="estudiante">
+        
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Paciente *</label>
+            <select id="at_paciente" required onchange="cargarDatosPaciente()">
+              <option value="">Seleccionar paciente</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Fecha y Hora</label>
+            <input type="datetime-local" id="at_fecha">
+          </div>
+        </div>
+
+        <h3 style="margin-top:20px;">📝 Motivo de Atención</h3>
+        <div class="form-group">
+          <textarea id="at_motivo" placeholder="Describa el motivo de la consulta..." required></textarea>
+        </div>
+
+        <h3>🩺 Signos Vitales</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Presión Arterial (mmHg)</label>
+            <input type="text" id="at_pa" placeholder="Ej: 120/80">
+          </div>
+          <div class="form-group">
+            <label>Frecuencia Cardiaca (lpm)</label>
+            <input type="number" id="at_fc" placeholder="Ej: 80">
+          </div>
+          <div class="form-group">
+            <label>Frecuencia Respiratoria (rpm)</label>
+            <input type="number" id="at_fr" placeholder="Ej: 18">
+          </div>
+          <div class="form-group">
+            <label>Temperatura (°C)</label>
+            <input type="number" step="0.1" id="at_temp" placeholder="Ej: 36.5">
+          </div>
+          <div class="form-group">
+            <label>Saturación O₂ (%)</label>
+            <input type="number" id="at_sat" placeholder="Ej: 98">
+          </div>
+        </div>
+
+        <h3>💊 Medicamentos Administrados</h3>
+        <div id="medicamentosAtencion"></div>
+
+        <h3>📋 Procedimiento / Indicaciones</h3>
+        <div class="form-group">
+          <textarea id="at_procedimiento" placeholder="Procedimientos realizados, indicaciones al paciente, si fue enviado a casa, al médico, etc."></textarea>
+        </div>
+
+        <div class="btn-group">
+          <button type="submit" class="btn btn-success">💾 Guardar Atención</button>
+          <button type="reset" class="btn btn-secondary">🔄 Limpiar</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>📋 Historial de Atenciones</h2>
+      <div class="buscador">
+        <input type="text" id="buscarAtencion" placeholder="🔍 Buscar por paciente o motivo..." oninput="filtrarAtenciones()">
+        <input type="date" id="filtroFechaAtencion" onchange="filtrarAtenciones()">
+        <select id="filtroTipoAtencion" onchange="filtrarAtenciones()">
+          <option value="">Todos los tipos</option>
+          <option value="estudiante">Estudiantes</option>
+          <option value="personal">Personal</option>
+        </select>
+      </div>
+      <div id="listaAtenciones"></div>
+    </div>
+  </div>
+
+  <!-- REPORTES -->
+  <div class="seccion" id="reportes">
+    <div class="panel">
+      <h2>📈 Generación de Reportes</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Tipo de Reporte</label>
+          <select id="tipoReporte" onchange="actualizarFormularioReportes()">
+            <option value="paciente">Reporte médico individual</option>
+            <option value="atenciones">Atenciones por Fecha</option>
+            <option value="estudiantes">Listado de Estudiantes</option>
+            <option value="personal">Listado de Personal</option>
+            <option value="medicamentos">Inventario de Medicamentos</option>
+            <option value="consumo">Consumo de Medicamentos</option>
+          </select>
+        </div>
+        <div class="form-group" id="grupoFechaInicio">
+          <label>Fecha Inicio</label>
+          <input type="date" id="rep_inicio">
+        </div>
+        <div class="form-group" id="grupoFechaFin">
+          <label>Fecha Fin</label>
+          <input type="date" id="rep_fin">
+        </div>
+        <div class="form-group" id="grupoPacienteReporte">
+          <label for="rep_paciente">Selecciona un estudiante o paciente</label>
+          <input type="search" id="rep_buscarPaciente" list="listaPacientesReporte" placeholder="Buscar y seleccionar por nombre..." oninput="buscarPacienteReporte()" onchange="seleccionarPacienteReporte()" autocomplete="off">
+          <datalist id="listaPacientesReporte"></datalist>
+          <input type="hidden" id="rep_paciente" value="">
+          <small id="ayudaPacienteReporte">Al elegir un estudiante verás su ficha, condición médica y todas sus atenciones.</small>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="generarReporte()">📄 Generar Reporte</button>
+        <button class="btn btn-success" onclick="exportarCSV()">📊 Exportar a CSV</button>
+        <button class="btn btn-warning" onclick="imprimirReporte()">🖨️ Imprimir / Guardar PDF</button>
+      </div>
+      <p style="font-size:12px; color:#666; margin-top:8px;">Para descargarlo en PDF, seleccione “Guardar como PDF” en el diálogo de impresión.</p>
+    </div>
+
+    <div class="panel" id="panelReporte" style="display:none;">
+      <h2>📄 Resultado del Reporte</h2>
+      <div id="contenidoReporte"></div>
+    </div>
+  </div>
+
+  <!-- USUARIOS -->
+  <div class="seccion" id="usuarios">
+    <div class="panel">
+      <h2>👤 Administración de Usuarios</h2>
+      <form id="formUsuario" onsubmit="guardarUsuario(event)">
+        <input type="hidden" id="usuarioId">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="usuarioNombre">Nombre *</label>
+            <input type="text" id="usuarioNombre" required maxlength="100">
+          </div>
+          <div class="form-group">
+            <label for="usuarioCorreo">Correo electrónico *</label>
+            <input type="email" id="usuarioCorreo" required maxlength="150">
+          </div>
+          <div class="form-group">
+            <label for="usuarioClave">Contraseña *</label>
+            <input type="password" id="usuarioClave" minlength="4" maxlength="100">
+          </div>
+          <div class="form-group">
+            <label for="usuarioEstado">Estado</label>
+            <select id="usuarioEstado">
+              <option value="activo">Activo</option>
+              <option value="inactivo">Inactivo</option>
+            </select>
+          </div>
+        </div>
+
+        <h3 style="margin-top:18px;">Permisos por página</h3>
+        <div class="permisos-grid" id="permisosUsuario"></div>
+        <div class="btn-group">
+          <button type="submit" class="btn btn-success">💾 Guardar usuario</button>
+          <button type="button" class="btn btn-secondary" onclick="limpiarFormularioUsuario()">Limpiar</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>Lista de Usuarios</h2>
+      <div class="tabla-container" id="listaUsuarios"></div>
+    </div>
+  </div>
+
+  <!-- CONFIGURACIÓN -->
+  <div class="seccion" id="configuracion">
+    <div class="panel">
+      <h2>⚙️ Configuración del Sistema</h2>
+      
+      <h3>🏫 Datos de la Institución</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nombre de la Escuela</label>
+          <input type="text" id="cfg_escuela" value="Escuela">
+        </div>
+        <div class="form-group">
+          <label>Nombre del Enfermero/a</label>
+          <input type="text" id="cfg_enfermero">
+        </div>
+        <div class="form-group">
+          <label>Teléfono de Emergencia</label>
+          <input type="tel" id="cfg_emergencia">
+        </div>
+      </div>
+
+      <h3 style="margin-top:20px;">💊 Configuración de Medicamentos</h3>
+      <div class="alerta alerta-warning">
+        ⚠️ La dosis diaria por defecto es 5 unidades (10 para Acetaminofén/Paracetamol). Los medicamentos no consumidos se acumulan al día siguiente.
+      </div>
+      <div id="configMeds"></div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="guardarConfiguracion()">💾 Guardar Configuración</button>
+        <button class="btn btn-danger" onclick="respaldarDatos()">📥 Respaldar Datos (JSON)</button>
+        <button class="btn btn-warning" onclick="document.getElementById('inputRestaurar').click()">📤 Restaurar Datos</button>
+        <input type="file" id="inputRestaurar" style="display:none" accept=".json" onchange="restaurarDatos(event)">
+        <button class="btn btn-danger" id="btnBorrarTodosRegistros" onclick="borrarTodosLosRegistros()">🗑️ Eliminar Todos los Registros</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL FICHA -->
+<div class="modal-overlay" id="modalFicha">
+  <div class="modal">
+    <button class="modal-close" onclick="cerrarModal('modalFicha')">✕</button>
+    <div id="contenidoFicha"></div>
+  </div>
+</div>
+
+<!-- MODAL MEDICAMENTO -->
+<div class="modal-overlay" id="modalMedicamento">
+  <div class="modal">
+    <button class="modal-close" onclick="cerrarModal('modalMedicamento')">✕</button>
+    <h2 id="tituloModalMedicamento">➕ Agregar Medicamento</h2>
+    <form id="formMedicamento" onsubmit="guardarMedicamento(event)">
+      <input type="hidden" id="med_id">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="med_nombre">Nombre del medicamento *</label>
+          <input type="text" id="med_nombre" required maxlength="100">
+        </div>
+        <div class="form-group">
+          <label for="med_stock">Stock actual *</label>
+          <input type="number" id="med_stock" min="0" step="1" required>
+        </div>
+        <div class="form-group">
+          <label for="med_dosis">Dosis diaria asignada *</label>
+          <input type="number" id="med_dosis" min="1" step="1" required>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button type="submit" class="btn btn-success">💾 Guardar</button>
+        <button type="button" class="btn btn-secondary" onclick="cerrarModal('modalMedicamento')">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL REPOSICIÓN -->
+<div class="modal-overlay" id="modalReposicion">
+  <div class="modal">
+    <button class="modal-close" onclick="cerrarModal('modalReposicion')">✕</button>
+    <h2>📦 Registrar Reposición de Medicamento</h2>
+    <div class="form-group">
+      <label>Medicamento</label>
+      <select id="rep_medicamento"></select>
+    </div>
+    <div class="form-group" style="margin-top:10px;">
+      <label>Cantidad a Agregar</label>
+      <input type="number" id="rep_cantidad" min="1" value="1">
+    </div>
+    <div class="form-group" style="margin-top:10px;">
+      <label>Observaciones (Lote, Fecha vencimiento, etc.)</label>
+      <textarea id="rep_obs"></textarea>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-success" onclick="guardarReposicion()">💾 Guardar</button>
+      <button class="btn btn-secondary" onclick="cerrarModal('modalReposicion')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ DATOS INICIALES ============
+const SUPABASE_URL = 'https://cjumqlbcdvclpyocdjpp.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_vbpK-7csXrtDcs_7EqxarA_8hd3xwqy';
+
+let supabaseClient = null;
+if (window.supabase && SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY) {
+  supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY,
+    { auth: { persistSession: true, autoRefreshToken: true } }
+  );
+}
+
+async function verificarConexionSupabase() {
+  if (!supabaseClient) return false;
+  try {
+    const respuesta = await fetch(`${SUPABASE_URL}/rest/v1/students?select=id&limit=1`, {
+      method: 'GET',
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+      }
+    });
+    const datosRespuesta = await respuesta.text();
+    if (!respuesta.ok) {
+      console.warn('Supabase respondió con error:', respuesta.status, datosRespuesta);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.warn('No se pudo conectar con Supabase:', error);
+    return false;
+  }
+}
+
+const MEDICAMENTOS_INICIALES = [
+  { nombre: "Acetaminofén 500 mg", stock: 100, dosisDiaria: 10, consumidoHoy: 0, acumulado: 0 },
+  { nombre: "Paracetamol 500 mg", stock: 100, dosisDiaria: 10, consumidoHoy: 0, acumulado: 0 },
+  { nombre: "Omeprazol 20 mg", stock: 50, dosisDiaria: 5, consumidoHoy: 0, acumulado: 0 },
+  { nombre: "Diclofenac 100 mg", stock: 50, dosisDiaria: 5, consumidoHoy: 0, acumulado: 0 },
+  { nombre: "Loratadina 10 mg", stock: 50, dosisDiaria: 5, consumidoHoy: 0, acumulado: 0 },
+  { nombre: "Cetirizina 10 mg", stock: 50, dosisDiaria: 5, consumidoHoy: 0, acumulado: 0 },
+  { nombre: "Dimenhidrinato 10 mg", stock: 50, dosisDiaria: 5, consumidoHoy: 0, acumulado: 0 },
+  { nombre: "Metoclopramida 10 mg", stock: 50, dosisDiaria: 5, consumidoHoy: 0, acumulado: 0 }
+];
+
+// ============ ALMACENAMIENTO ============
+function cargarDatos() {
+  return {
+    estudiantes: [],
+    personal: [],
+    medicamentos: JSON.parse(JSON.stringify(MEDICAMENTOS_INICIALES)),
+    atenciones: [],
+    historialConsumo: [],
+    reposiciones: [],
+    config: {},
+    ultimoReset: ''
+  };
+}
+
+function guardarDatos(datos) {
+  if (supabaseClient && usuarioSesion) {
+    sincronizarDatosConSupabase(datos).catch(error => {
+      console.error('Error sincronizando con Supabase:', error);
+      alert(`Error guardando en Supabase: ${error.message || 'Error de permisos o conexión'}`);
+    });
+  }
+}
+
+async function guardarDatosConfirmado(datos) {
+  if (!supabaseClient || !usuarioSesion) {
+    throw new Error('No hay una sesión activa para guardar los cambios.');
+  }
+  await sincronizarDatosConSupabase(datos);
+}
+
+async function eliminarRegistroSupabase(tabla, id) {
+  const identificador = String(id);
+  if (!supabaseClient || !usuarioSesion ||
+      (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identificador) &&
+       !(/^\d+$/.test(identificador) && identificador.length < 13))) {
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from(tabla)
+    .delete()
+    .eq('id', identificador)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('No se pudo eliminar el registro. Verifique sus permisos.');
+  }
+}
+
+async function cargarDatosDesdeSupabase() {
+  if (!supabaseClient || !usuarioSesion) return false;
+
+  const [
+    estudiantes,
+    personal,
+    medicamentos,
+    atenciones,
+    medicamentosAtencion,
+    reposiciones,
+    consumo,
+    configuracion
+  ] = await Promise.all([
+    supabaseClient.from('students').select('*').order('full_name'),
+    supabaseClient.from('staff').select('*').order('full_name'),
+    supabaseClient.from('medications').select('*').order('name'),
+    supabaseClient.from('attentions').select('*').order('attended_at', { ascending: false }),
+    supabaseClient.from('attention_medications').select('*'),
+    supabaseClient.from('medication_replenishments').select('*').order('replenished_at', { ascending: false }),
+    supabaseClient.from('consumption_history').select('*').order('consumed_at', { ascending: false }),
+    supabaseClient.from('institution_settings').select('*').eq('id', 1).maybeSingle()
+  ]);
+
+  const errorRespuesta = [
+    estudiantes, personal, medicamentos, atenciones,
+    medicamentosAtencion, reposiciones, consumo, configuracion
+  ].find(respuesta => respuesta.error);
+  if (errorRespuesta) throw errorRespuesta.error;
+
+  datos.estudiantes = (estudiantes.data || []).map(item => ({
+    id: String(item.id),
+    nombre: item.full_name,
+    edad: item.age || '',
+    sexo: item.sex || '',
+    curso: item.course || '',
+    maestro: item.teacher || '',
+    responsable: item.guardian_name || '',
+    telefono: item.phone || '',
+    alergias: item.allergies || '',
+    observaciones: item.observations || '',
+    fechaRegistro: item.created_at
+  }));
+  datos.personal = (personal.data || []).map(item => ({
+    id: String(item.id),
+    nombre: item.full_name,
+    tipo: item.staff_type || '',
+    cargo: item.position || '',
+    area: item.department || '',
+    telefono: item.phone || '',
+    alergias: item.allergies || '',
+    observaciones: item.observations || '',
+    fechaRegistro: item.created_at
+  }));
+  datos.medicamentos = (medicamentos.data || []).map(item => ({
+    id: String(item.id),
+    nombre: item.name,
+    stock: item.stock,
+    dosisDiaria: item.daily_dose,
+    acumulado: item.accumulated,
+    consumidoHoy: item.consumed_today
+  }));
+  if (!datos.medicamentos.length) {
+    datos.medicamentos = JSON.parse(JSON.stringify(MEDICAMENTOS_INICIALES));
+  }
+  const medicamentosPorAtencion = new Map(
+    (medicamentosAtencion.data || []).map(item => [item.attention_id, item])
+  );
+  datos.atenciones = (atenciones.data || []).map(item => {
+    const medicamentosRelacionados = (medicamentosAtencion.data || [])
+      .filter(med => String(med.attention_id) === String(item.id))
+      .map(med => ({ nombre: med.medication_name, cantidad: med.quantity }));
+    return {
+      id: String(item.id),
+      pacienteId: String(item.patient_type === 'estudiante' ? item.student_id : item.staff_id),
+      pacienteNombre: item.patient_name,
+      tipo: item.patient_type,
+      motivo: item.reason || '',
+      pa: item.blood_pressure || '',
+      fc: item.heart_rate || '',
+      fr: item.respiratory_rate || '',
+      temp: item.temperature || '',
+      sat: item.oxygen_saturation || '',
+      medicamentos: medicamentosRelacionados,
+      procedimiento: item.procedure_notes || '',
+      registradoPor: item.registered_by || '',
+      fecha: item.attended_at
+    };
+  });
+  datos.reposiciones = (reposiciones.data || []).map(item => ({
+    id: String(item.id),
+    medicamento: item.medication_name,
+    cantidad: item.quantity,
+    observaciones: item.observations || '',
+    fecha: item.replenished_at
+  }));
+  datos.historialConsumo = (consumo.data || []).map(item => ({
+    id: String(item.id),
+    fecha: item.consumed_at,
+    nombre: item.medication_name,
+    consumido: item.consumed,
+    acumulado: item.accumulated
+  }));
+  datos.config = configuracion.data ? {
+    escuela: configuracion.data.school_name,
+    enfermero: configuracion.data.nurse_name,
+    emergencia: configuracion.data.emergency_phone
+  } : {};
+  return true;
+}
+
+async function sincronizarDatosConSupabase(datosActuales) {
+  if (!supabaseClient) throw new Error('Supabase no está configurado.');
+
+  if (datosActuales.estudiantes.length) {
+    const filasExistentes = datosActuales.estudiantes.filter(item =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
+      || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
+    ).map(item => ({
+      id: String(item.id),
+      full_name: item.nombre,
+      age: item.edad ? Number(item.edad) : null,
+      sex: item.sexo || null,
+      course: item.curso || null,
+      teacher: item.maestro || null,
+      guardian_name: item.responsable || null,
+      phone: item.telefono || null,
+      allergies: item.alergias || null,
+      observations: item.observaciones || null
+    }));
+    if (filasExistentes.length) {
+      const { error } = await supabaseClient.from('students').upsert(filasExistentes);
+      if (error) throw error;
+    }
+    const filasNuevas = datosActuales.estudiantes.filter(item => !filasExistentes.some(fila =>
+      String(fila.id) === String(item.id)
+    ));
+    if (filasNuevas.length) {
+      const { data, error } = await supabaseClient.from('students').insert(
+        filasNuevas.map(item => ({
+          full_name: item.nombre,
+          age: item.edad ? Number(item.edad) : null,
+          sex: item.sexo || null,
+          course: item.curso || null,
+          teacher: item.maestro || null,
+          guardian_name: item.responsable || null,
+          phone: item.telefono || null,
+          allergies: item.alergias || null,
+          observations: item.observaciones || null
+        }))
+      ).select('id,full_name');
+      if (error) throw error;
+      (data || []).forEach((fila, indice) => {
+        const local = filasNuevas[indice];
+        if (local) local.id = String(fila.id);
+      });
+    }
+  }
+  if (datosActuales.personal.length) {
+    const filasExistentes = datosActuales.personal.filter(item =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
+      || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
+    ).map(item => ({
+      id: String(item.id),
+      full_name: item.nombre,
+      staff_type: item.tipo || null,
+      position: item.cargo || null,
+      department: item.area || null,
+      phone: item.telefono || null,
+      allergies: item.alergias || null,
+      observations: item.observaciones || null
+    }));
+    if (filasExistentes.length) {
+      const { error } = await supabaseClient.from('staff').upsert(filasExistentes);
+      if (error) throw error;
+    }
+    const filasNuevas = datosActuales.personal.filter(item => !filasExistentes.some(fila =>
+      String(fila.id) === String(item.id)
+    ));
+    if (filasNuevas.length) {
+      const { data, error } = await supabaseClient.from('staff').insert(
+        filasNuevas.map(item => ({
+          full_name: item.nombre,
+          staff_type: item.tipo || null,
+          position: item.cargo || null,
+          department: item.area || null,
+          phone: item.telefono || null,
+          allergies: item.alergias || null,
+          observations: item.observaciones || null
+        }))
+      ).select('id');
+      if (error) throw error;
+      (data || []).forEach((fila, indice) => {
+        const local = filasNuevas[indice];
+        if (local) local.id = String(fila.id);
+      });
+    }
+  }
+  if (datosActuales.medicamentos.length) {
+    const filasExistentes = datosActuales.medicamentos.filter(item =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
+      || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
+    ).map(item => ({
+      id: String(item.id),
+      name: item.nombre,
+      stock: Number(item.stock) || 0,
+      daily_dose: Number(item.dosisDiaria) || 5,
+      accumulated: Number(item.acumulado) || 0,
+      consumed_today: Number(item.consumidoHoy) || 0
+    }));
+    if (filasExistentes.length) {
+      const { error } = await supabaseClient.from('medications').upsert(filasExistentes);
+      if (error) throw error;
+    }
+    const filasNuevas = datosActuales.medicamentos.filter(item => !filasExistentes.some(fila =>
+      String(fila.id) === String(item.id)
+    ));
+    if (filasNuevas.length) {
+      const { data, error } = await supabaseClient.from('medications').insert(
+        filasNuevas.map(item => ({
+          name: item.nombre,
+          stock: Number(item.stock) || 0,
+          daily_dose: Number(item.dosisDiaria) || 5,
+          accumulated: Number(item.acumulado) || 0,
+          consumed_today: Number(item.consumidoHoy) || 0
+        }))
+      ).select('id');
+      if (error) throw error;
+      (data || []).forEach((fila, indice) => {
+        const local = filasNuevas[indice];
+        if (local) local.id = String(fila.id);
+      });
+    }
+  }
+  if (datosActuales.atenciones.length) {
+    const filasExistentes = datosActuales.atenciones.filter(item =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
+      || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
+    ).map(item => ({
+      id: String(item.id),
+      patient_name: item.pacienteNombre,
+      patient_type: item.tipo,
+      reason: item.motivo || null,
+      blood_pressure: item.pa || null,
+      heart_rate: item.fc ? Number(item.fc) : null,
+      respiratory_rate: item.fr ? Number(item.fr) : null,
+      temperature: item.temp ? Number(item.temp) : null,
+      oxygen_saturation: item.sat ? Number(item.sat) : null,
+      procedure_notes: item.procedimiento || null,
+      registered_by: item.registradoPor || null,
+      attended_at: item.fecha || new Date().toISOString()
+    }));
+    if (filasExistentes.length) {
+      const { error } = await supabaseClient.from('attentions').upsert(filasExistentes);
+      if (error) throw error;
+    }
+    const filasNuevas = datosActuales.atenciones.filter(item => !filasExistentes.some(fila =>
+      String(fila.id) === String(item.id)
+    ));
+    if (filasNuevas.length) {
+      const { data, error } = await supabaseClient.from('attentions').insert(
+        filasNuevas.map(item => ({
+          patient_name: item.pacienteNombre,
+          patient_type: item.tipo,
+          reason: item.motivo || null,
+          blood_pressure: item.pa || null,
+          heart_rate: item.fc ? Number(item.fc) : null,
+          respiratory_rate: item.fr ? Number(item.fr) : null,
+          temperature: item.temp ? Number(item.temp) : null,
+          oxygen_saturation: item.sat ? Number(item.sat) : null,
+          procedure_notes: item.procedimiento || null,
+          registered_by: item.registradoPor || null,
+          attended_at: item.fecha || new Date().toISOString()
+        }))
+      ).select('id');
+      if (error) throw error;
+      (data || []).forEach((fila, indice) => {
+        const local = filasNuevas[indice];
+        if (local) local.id = String(fila.id);
+      });
+    }
+
+    const relaciones = [];
+    datosActuales.atenciones.forEach(item => {
+      (item.medicamentos || []).forEach(med => relaciones.push({
+        attention_id: String(item.id),
+        medication_name: med.nombre,
+        quantity: Number(med.cantidad) || 1
+      }));
+    });
+    if (relaciones.length) {
+      await supabaseClient.from('attention_medications').upsert(relaciones);
+    }
+  }
+  if (datosActuales.reposiciones.length) {
+    const filasExistentes = datosActuales.reposiciones.filter(item =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
+      || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
+    ).map(item => ({
+      id: String(item.id),
+      medication_name: item.medicamento,
+      quantity: Number(item.cantidad) || 1,
+      observations: item.observaciones || null,
+      replenished_at: item.fecha || new Date().toISOString()
+    }));
+    if (filasExistentes.length) {
+      const { error } = await supabaseClient.from('medication_replenishments').upsert(filasExistentes);
+      if (error) throw error;
+    }
+    const filasNuevas = datosActuales.reposiciones.filter(item => !filasExistentes.some(fila =>
+      String(fila.id) === String(item.id)
+    ));
+    if (filasNuevas.length) {
+      const { error } = await supabaseClient.from('medication_replenishments').insert(
+        filasNuevas.map(item => ({
+          medication_name: item.medicamento,
+          quantity: Number(item.cantidad) || 1,
+          observations: item.observaciones || null,
+          replenished_at: item.fecha || new Date().toISOString()
+        }))
+      );
+      if (error) throw error;
+    }
+  }
+  if (datosActuales.historialConsumo.length) {
+    const filas = datosActuales.historialConsumo.map(item => ({
+      medication_name: item.nombre,
+      consumed: Number(item.consumido) || 0,
+      accumulated: Number(item.acumulado) || 0,
+      consumed_at: item.fecha
+    }));
+    const { error } = await supabaseClient.from('consumption_history').upsert(filas);
+    if (error) throw error;
+  }
+  if (datosActuales.config) {
+    const configuracion = {
+      id: 1,
+      school_name: datosActuales.config.escuela || 'Escuela',
+      nurse_name: datosActuales.config.enfermero || '',
+      emergency_phone: datosActuales.config.emergencia || ''
+    };
+    const { error: errorActualizacion } = await supabaseClient
+      .from('institution_settings')
+      .update(configuracion)
+      .eq('id', 1);
+    if (errorActualizacion) throw errorActualizacion;
+
+    const { data: existeConfiguracion } = await supabaseClient
+      .from('institution_settings')
+      .select('id')
+      .eq('id', 1)
+      .maybeSingle();
+    if (!existeConfiguracion) {
+      const { error: errorInsercion } = await supabaseClient
+        .from('institution_settings')
+        .insert(configuracion);
+      if (errorInsercion) throw errorInsercion;
+    }
+  }
+}
+
+let datos = cargarDatos();
+
+// ============ USUARIOS Y PERMISOS ============
+const USUARIOS_INICIALES = [{
+  id: 1,
+  nombre: 'Administrador',
+  correo: 'ministrylion@gmail.com',
+  clave: 'admin22',
+  estado: 'activo',
+  admin: true,
+  permisos: {}
+}];
+
+const PAGINAS_SISTEMA = [
+  { id: 'dashboard', nombre: 'Dashboard' },
+  { id: 'estudiantes', nombre: 'Estudiantes' },
+  { id: 'personal', nombre: 'Personal' },
+  { id: 'medicamentos', nombre: 'Medicamentos' },
+  { id: 'atenciones', nombre: 'Atenciones' },
+  { id: 'reportes', nombre: 'Reportes' },
+  { id: 'usuarios', nombre: 'Usuarios' },
+  { id: 'configuracion', nombre: 'Configuración' }
+];
+
+let usuarioSesion = null;
+
+let usuariosCache = [];
+
+async function cargarUsuarios() {
+  if (!supabaseClient || !usuarioSesion) return [];
+  if (!usuarioSesion.admin) return usuariosCache;
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .select('id,full_name,email,is_admin,is_active')
+    .order('full_name');
+  if (error) throw error;
+  usuariosCache = (data || []).map(usuario => ({
+    id: usuario.id,
+    nombre: usuario.full_name,
+    correo: usuario.email,
+    estado: usuario.is_active ? 'activo' : 'inactivo',
+    admin: usuario.is_admin,
+    permisos: {}
+  }));
+  await cargarPermisosUsuariosCache();
+  return usuariosCache;
+}
+
+async function cargarPermisosUsuariosCache() {
+  if (!usuariosCache.length) return;
+  const ids = usuariosCache.map(usuario => usuario.id);
+  const { data, error } = await supabaseClient
+    .from('page_permissions')
+    .select('user_id,page,can_view,can_edit')
+    .in('user_id', ids);
+  if (error) throw error;
+  usuariosCache.forEach(usuario => usuario.permisos = permisosPorDefecto());
+  (data || []).forEach(permiso => {
+    const usuario = usuariosCache.find(item => item.id === permiso.user_id);
+    if (usuario) {
+      usuario.permisos[permiso.page] = {
+        ver: Boolean(permiso.can_view),
+        editar: Boolean(permiso.can_edit)
+      };
+    }
+  });
+}
+
+function guardarUsuarios(usuarios) {
+  usuariosCache = usuarios;
+}
+
+function permisosPorDefecto() {
+  const permisos = {};
+  PAGINAS_SISTEMA.forEach(pagina => permisos[pagina.id] = { ver: false, editar: false });
+  return permisos;
+}
+
+async function iniciarSesion(event) {
+  event.preventDefault();
+  const correo = document.getElementById('loginCorreo').value.trim().toLowerCase();
+  const clave = document.getElementById('loginClave').value;
+
+  if (supabaseClient) {
+    try {
+      const { data: authData, error: authError } =
+        await supabaseClient.auth.signInWithPassword({ email: correo, password: clave });
+      if (!authError && authData?.user) {
+        const { data: perfil } = await supabaseClient
+          .from('profiles')
+          .select('id,full_name,email,is_admin,is_active')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+
+        if (perfil?.is_active !== false) {
+          const { data: permisosDB } = await supabaseClient
+            .from('page_permissions')
+            .select('page,can_view,can_edit')
+            .eq('user_id', authData.user.id);
+
+          const permisos = permisosPorDefecto();
+          (permisosDB || []).forEach(permiso => {
+            permisos[permiso.page] = {
+              ver: Boolean(permiso.can_view),
+              editar: Boolean(permiso.can_edit)
+            };
+          });
+
+          usuarioSesion = {
+            id: perfil?.id || authData.user.id,
+            nombre: perfil?.full_name || authData.user.email,
+            correo: perfil?.email || authData.user.email,
+            estado: 'activo',
+            admin: Boolean(perfil?.is_admin),
+            permisos
+          };
+          document.getElementById('loginOverlay').style.display = 'none';
+          document.getElementById('loginError').style.display = 'none';
+          aplicarPermisosSesion();
+          try {
+            await cargarDatosDesdeSupabase();
+            renderEstudiantes();
+            actualizarCursos();
+            renderPersonal();
+            renderAtenciones();
+            actualizarDashboard();
+            cargarConfiguracion();
+          } catch (error) {
+            console.error('Error cargando datos de Supabase:', error);
+          }
+          cargarDatosIniciales();
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn('El inicio de sesión en Supabase no estuvo disponible:', error);
+    }
+  }
+
+  document.getElementById('loginError').style.display = 'block';
+}
+
+async function cerrarSesion() {
+  if (supabaseClient) {
+    await supabaseClient.auth.signOut();
+  }
+  usuarioSesion = null;
+  document.getElementById('loginCorreo').value = '';
+  document.getElementById('loginClave').value = '';
+  document.getElementById('loginOverlay').style.display = 'flex';
+}
+
+function tienePermiso(pagina, accion = 'ver') {
+  if (!usuarioSesion) return false;
+  if (usuarioSesion.admin) return true;
+  return Boolean(usuarioSesion.permisos?.[pagina]?.[accion]);
+}
+
+function exigirPermisoEdicion(pagina) {
+  if (tienePermiso(pagina, 'editar')) return true;
+  alert('No tiene permiso de edición para esta sección.');
+  return false;
+}
+
+function aplicarPermisosSesion() {
+  if (!usuarioSesion) return;
+  if (usuarioSesion.correo?.toLowerCase() === 'ministrylion@gmail.com') {
+    usuarioSesion.admin = true;
+  }
+  document.getElementById('usuarioActual').textContent =
+    `${usuarioSesion.nombre} (${usuarioSesion.admin ? 'Administrador' : 'Usuario'})`;
+  const botonEliminarTodo = document.getElementById('btnBorrarTodosRegistros');
+  if (botonEliminarTodo) {
+    botonEliminarTodo.style.display = usuarioSesion.admin ? '' : 'none';
+  }
+
+  const botonesNav = document.querySelectorAll('.nav button');
+  PAGINAS_SISTEMA.forEach(pagina => {
+    const boton = Array.from(botonesNav).find(item =>
+      item.getAttribute('onclick')?.includes(`'${pagina.id}'`)
+    );
+    if (boton) boton.style.display = tienePermiso(pagina.id, 'ver') ? '' : 'none';
+  });
+
+  const primeraVisible = PAGINAS_SISTEMA.find(pagina => tienePermiso(pagina.id, 'ver'));
+  const activa = document.querySelector('.seccion.activa');
+  if (activa && !tienePermiso(activa.id, 'ver') && primeraVisible) {
+    const botonPrimera = Array.from(botonesNav).find(item =>
+      item.getAttribute('onclick')?.includes(`'${primeraVisible.id}'`)
+    );
+    if (botonPrimera) mostrarSeccion(primeraVisible.id, botonPrimera);
+  }
+
+  PAGINAS_SISTEMA.forEach(pagina => {
+    const seccion = document.getElementById(pagina.id);
+    if (!seccion) return;
+    seccion.querySelectorAll('form').forEach(formulario => {
+      if (pagina.id === 'reportes') return;
+      formulario.querySelectorAll('input, select, textarea, button[type="submit"]').forEach(control => {
+        control.disabled = !tienePermiso(pagina.id, 'editar');
+      });
+    });
+  });
+}
+
+async function restaurarSesion() {
+  if (supabaseClient) {
+    try {
+      const { data: authData } = await supabaseClient.auth.getSession();
+      const authUser = authData?.session?.user;
+      if (authUser) {
+        const { data: perfil } = await supabaseClient
+          .from('profiles')
+          .select('id,full_name,email,is_admin,is_active')
+          .eq('id', authUser.id)
+          .maybeSingle();
+        if (perfil?.is_active !== false) {
+          const { data: permisosDB } = await supabaseClient
+            .from('page_permissions')
+            .select('page,can_view,can_edit')
+            .eq('user_id', authUser.id);
+          const permisos = permisosPorDefecto();
+          (permisosDB || []).forEach(permiso => {
+            permisos[permiso.page] = {
+              ver: Boolean(permiso.can_view),
+              editar: Boolean(permiso.can_edit)
+            };
+          });
+          usuarioSesion = {
+            id: perfil?.id || authUser.id,
+            nombre: perfil?.full_name || authUser.email,
+            correo: perfil?.email || authUser.email,
+            estado: 'activo',
+            admin: Boolean(perfil?.is_admin),
+            permisos
+          };
+          document.getElementById('loginOverlay').style.display = 'none';
+          aplicarPermisosSesion();
+          try {
+            await cargarDatosDesdeSupabase();
+          } catch (error) {
+            console.error('Error cargando datos de Supabase:', error);
+          }
+          return true;
+        }
+      }
+    } catch (error) {
+      console.warn('No se pudo restaurar la sesión de Supabase:', error);
+    }
+  }
+
+  return false;
+}
+
+function cargarPermisosFormulario(permisos) {
+  const contenedor = document.getElementById('permisosUsuario');
+  if (!contenedor) return;
+  contenedor.innerHTML = PAGINAS_SISTEMA
+    .filter(pagina => pagina.id !== 'usuarios')
+    .map(pagina => {
+      const permiso = permisos?.[pagina.id] || { ver: false, editar: false };
+      return `
+        <div class="permiso-fila">
+          <label>${pagina.nombre}</label>
+          <span class="permiso-opcion"><input type="checkbox" data-permiso="${pagina.id}" data-accion="ver" ${permiso.ver ? 'checked' : ''}> Ver</span>
+          <span class="permiso-opcion"><input type="checkbox" data-permiso="${pagina.id}" data-accion="editar" ${permiso.editar ? 'checked' : ''}> Editar</span>
+        </div>
+      `;
+    }).join('');
+}
+
+function obtenerPermisosFormulario() {
+  const permisos = permisosPorDefecto();
+  document.querySelectorAll('#permisosUsuario [data-permiso]').forEach(input => {
+    const pagina = input.dataset.permiso;
+    const accion = input.dataset.accion;
+    if (!permisos[pagina]) permisos[pagina] = { ver: false, editar: false };
+    permisos[pagina][accion] = input.checked;
+  });
+  permisos.usuarios = { ver: false, editar: false };
+  return permisos;
+}
+
+async function guardarUsuario(event) {
+  event.preventDefault();
+  if (!tienePermiso('usuarios', 'editar')) {
+    alert('No tiene permiso para administrar usuarios.');
+    return;
+  }
+  const id = document.getElementById('usuarioId').value;
+  const nombre = document.getElementById('usuarioNombre').value.trim();
+  const correo = document.getElementById('usuarioCorreo').value.trim().toLowerCase();
+  const clave = document.getElementById('usuarioClave').value;
+  const estado = document.getElementById('usuarioEstado').value;
+  if (!nombre || !correo) return;
+
+  const usuarios = await cargarUsuarios();
+  const existe = usuarios.find(u => u.correo.toLowerCase() === correo && String(u.id) !== id);
+  if (existe) {
+    alert('Ya existe un usuario con ese correo.');
+    return;
+  }
+
+  const permisos = obtenerPermisosFormulario();
+  if (id) {
+    const usuario = usuarios.find(u => String(u.id) === id);
+    if (!usuario || usuario.admin) {
+      alert('La cuenta administradora no puede modificarse desde este formulario.');
+      return;
+    }
+    const { error: perfilError } = await supabaseClient
+      .from('profiles')
+      .update({
+        full_name: nombre,
+        email: correo,
+        is_active: estado === 'activo'
+      })
+      .eq('id', id);
+    if (perfilError) {
+      alert('No se pudo actualizar el perfil: ' + perfilError.message);
+      return;
+    }
+    await supabaseClient.from('page_permissions').delete().eq('user_id', id);
+    const filasPermisos = PAGINAS_SISTEMA
+      .filter(pagina => pagina.id !== 'usuarios')
+      .map(pagina => ({
+        user_id: id,
+        page: pagina.id,
+        can_view: Boolean(permisos[pagina.id]?.ver),
+        can_edit: Boolean(permisos[pagina.id]?.editar)
+      }));
+    if (filasPermisos.length) {
+      const { error: permisosError } = await supabaseClient
+        .from('page_permissions')
+        .insert(filasPermisos);
+      if (permisosError) {
+        alert('No se pudieron guardar los permisos: ' + permisosError.message);
+        return;
+      }
+    }
+  } else {
+    if (!clave) {
+      alert('La contraseña es obligatoria para usuarios nuevos.');
+      return;
+    }
+    const { data: nuevoUsuario, error: registroError } =
+      await supabaseClient.auth.signUp({
+        email: correo,
+        password: clave,
+        options: { data: { full_name: nombre } }
+      });
+    if (registroError) {
+      alert('No se pudo crear el usuario: ' + registroError.message);
+      return;
+    }
+    if (!nuevoUsuario?.user) {
+      alert('El usuario fue registrado, pero Supabase requiere confirmar el correo.');
+      return;
+    }
+    const nuevoId = nuevoUsuario.user.id;
+    const { error: perfilError } = await supabaseClient
+      .from('profiles')
+      .update({
+        full_name: nombre,
+        email: correo,
+        is_admin: false,
+        is_active: estado === 'activo'
+      })
+      .eq('id', nuevoId);
+    if (perfilError) {
+      alert('No se pudo configurar el perfil: ' + perfilError.message);
+      return;
+    }
+    const filasPermisos = PAGINAS_SISTEMA
+      .filter(pagina => pagina.id !== 'usuarios')
+      .map(pagina => ({
+        user_id: nuevoId,
+        page: pagina.id,
+        can_view: Boolean(permisos[pagina.id]?.ver),
+        can_edit: Boolean(permisos[pagina.id]?.editar)
+      }));
+    if (filasPermisos.length) {
+      await supabaseClient.from('page_permissions').insert(filasPermisos);
+    }
+    await supabaseClient.auth.signOut();
+  }
+  limpiarFormularioUsuario();
+  await renderUsuarios();
+  alert('✅ Usuario guardado correctamente');
+}
+
+async function editarUsuario(id) {
+  if (!tienePermiso('usuarios', 'editar')) return;
+  const usuario = (await cargarUsuarios()).find(u => String(u.id) === String(id));
+  if (!usuario || usuario.admin) {
+    alert('La cuenta administradora principal se mantiene protegida.');
+    return;
+  }
+  document.getElementById('usuarioId').value = usuario.id;
+  document.getElementById('usuarioNombre').value = usuario.nombre;
+  document.getElementById('usuarioCorreo').value = usuario.correo;
+  document.getElementById('usuarioClave').value = '';
+  document.getElementById('usuarioClave').required = false;
+  document.getElementById('usuarioEstado').value = usuario.estado || 'activo';
+  cargarPermisosFormulario(usuario.permisos);
+  window.scrollTo({ top: document.getElementById('usuarios').offsetTop, behavior: 'smooth' });
+}
+
+async function eliminarUsuario(id) {
+  if (!tienePermiso('usuarios', 'editar')) return;
+  const usuarios = await cargarUsuarios();
+  const usuario = usuarios.find(u => String(u.id) === String(id));
+  if (!usuario || usuario.admin) {
+    alert('No puede eliminar la cuenta administradora principal.');
+    return;
+  }
+  if (!confirm(`¿Eliminar al usuario ${usuario.nombre}?`)) return;
+  const { error } = await supabaseClient
+    .from('profiles')
+    .update({ is_active: false })
+    .eq('id', id);
+  if (error) {
+    alert('No se pudo desactivar el usuario: ' + error.message);
+    return;
+  }
+  await renderUsuarios();
+}
+
+function limpiarFormularioUsuario() {
+  document.getElementById('formUsuario').reset();
+  document.getElementById('usuarioId').value = '';
+  document.getElementById('usuarioClave').required = true;
+  cargarPermisosFormulario(permisosPorDefecto());
+}
+
+async function renderUsuarios() {
+  const contenedor = document.getElementById('listaUsuarios');
+  if (!contenedor) return;
+  const usuarios = await cargarUsuarios();
+  contenedor.innerHTML = `
+    <table>
+      <thead><tr><th>Nombre</th><th>Correo</th><th>Tipo</th><th>Estado</th><th>Permisos</th><th>Acciones</th></tr></thead>
+      <tbody>
+        ${usuarios.map(usuario => {
+          const permisos = usuario.admin
+            ? 'Acceso completo'
+            : PAGINAS_SISTEMA.filter(p => usuario.permisos?.[p.id]?.ver).map(p => p.nombre).join(', ') || 'Sin páginas';
+          return `
+            <tr>
+              <td>${escaparHTML(usuario.nombre)}</td>
+              <td>${escaparHTML(usuario.correo)}</td>
+              <td>${usuario.admin ? 'Administrador' : 'Usuario'}</td>
+              <td>${usuario.estado === 'inactivo' ? 'Inactivo' : 'Activo'}</td>
+              <td class="usuario-permisos">${escaparHTML(permisos)}</td>
+              <td>
+                ${usuario.admin ? '-' : `
+                  <button class="btn btn-primary btn-sm" onclick="editarUsuario(${argumentoIdHTML(usuario.id)})">Editar</button>
+                  <button class="btn btn-danger btn-sm" onclick="eliminarUsuario(${argumentoIdHTML(usuario.id)})">Eliminar</button>
+                `}
+              </td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function cargarDatosIniciales() {
+  verificarResetDiario();
+  actualizarFecha();
+  renderEstudiantes();
+  actualizarCursos();
+  renderPersonal();
+  renderAtenciones();
+  actualizarDashboard();
+  setInterval(actualizarFecha, 60000);
+}
+
+// ============ VERIFICAR RESET DIARIO ============
+function verificarResetDiario() {
+  const hoy = new Date().toDateString();
+  if (datos.ultimoReset !== hoy) {
+    // Registrar consumo del día anterior antes de resetear
+    if (datos.ultimoReset) {
+      const consumo = datos.medicamentos.map(m => ({
+        fecha: datos.ultimoReset,
+        nombre: m.nombre,
+        consumido: m.consumidoHoy,
+        acumulado: m.acumulado
+      }));
+      datos.historialConsumo.push(...consumo);
+    }
+    // Acumular no consumidos al día siguiente
+    datos.medicamentos.forEach(m => {
+      const disponible = m.dosisDiaria + m.acumulado;
+      const noUsado = disponible - m.consumidoHoy;
+      m.acumulado = Math.max(0, noUsado);
+      m.consumidoHoy = 0;
+    });
+    datos.ultimoReset = hoy;
+    guardarDatos(datos);
+  }
+}
+
+// ============ NAVEGACIÓN ============
+function mostrarSeccion(id, btn) {
+  if (!tienePermiso(id, 'ver')) {
+    alert('No tiene permiso para acceder a esta sección.');
+    return;
+  }
+  document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('activa');
+  btn.classList.add('active');
+  if (id === 'dashboard') actualizarDashboard();
+  if (id === 'medicamentos') renderMedicamentos();
+  if (id === 'atenciones') cargarPacientesAtencion();
+  if (id === 'configuracion') cargarConfiguracion();
+  if (id === 'usuarios') {
+    cargarPermisosFormulario();
+    renderUsuarios();
+  }
+  if (id === 'reportes') {
+    cargarPacientesReporte();
+    actualizarFormularioReportes();
+  }
+}
+
+// ============ FECHA ============
+function actualizarFecha() {
+  const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const fecha = new Date().toLocaleDateString('es-ES', opciones);
+  document.getElementById('fechaActual').textContent = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+  document.getElementById('fechaHoy').textContent = new Date().toLocaleDateString('es-ES');
+}
+
+// ============ ESTUDIANTES ============
+function leerCSV(texto) {
+  const filas = [];
+  let fila = [];
+  let campo = '';
+  let dentroComillas = false;
+
+  for (let i = 0; i < texto.length; i++) {
+    const caracter = texto[i];
+    if (caracter === '"') {
+      if (dentroComillas && texto[i + 1] === '"') {
+        campo += '"';
+        i++;
+      } else {
+        dentroComillas = !dentroComillas;
+      }
+    } else if ((caracter === ',' || caracter === ';') && !dentroComillas) {
+      fila.push(campo.trim());
+      campo = '';
+    } else if ((caracter === '\n' || caracter === '\r') && !dentroComillas) {
+      if (caracter === '\r' && texto[i + 1] === '\n') i++;
+      fila.push(campo.trim());
+      if (fila.some(valor => valor !== '')) filas.push(fila);
+      fila = [];
+      campo = '';
+    } else {
+      campo += caracter;
+    }
+  }
+
+  fila.push(campo.trim());
+  if (fila.some(valor => valor !== '')) filas.push(fila);
+  return filas;
+}
+
+function normalizarEncabezadoCSV(valor) {
+  return valor
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function descargarCSV(nombreArchivo, encabezados, filasEjemplo) {
+  const escapeCSV = valor => `"${String(valor ?? '').replace(/"/g, '""')}"`;
+  const contenido = [
+    encabezados.map(escapeCSV).join(','),
+    ...(filasEjemplo || []).map(fila => fila.map(escapeCSV).join(','))
+  ].join('\r\n');
+  const blob = new Blob(['\uFEFF' + contenido], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  enlace.click();
+  URL.revokeObjectURL(url);
+}
+
+function descargarPlantillaEstudiantes() {
+  descargarCSV(
+    'plantilla_estudiantes.csv',
+    ['Nombre Completo'],
+    [['Juan Perez']]
+  );
+}
+
+function descargarPlantillaPersonal() {
+  descargarCSV(
+    'plantilla_personal.csv',
+    ['Nombre Completo'],
+    [['Maria Gomez']]
+  );
+}
+
+function mapearFilaCSV(filas, nombresEncabezados) {
+  if (!filas.length) return [];
+  const indices = {};
+  filas[0].forEach((encabezado, indice) => {
+    indices[normalizarEncabezadoCSV(encabezado)] = indice;
+  });
+  return filas.slice(1).map(fila => {
+    const registro = {};
+    nombresEncabezados.forEach(({ encabezado, campo }) => {
+      const indice = indices[normalizarEncabezadoCSV(encabezado)];
+      registro[campo] = indice !== undefined ? (fila[indice] || '').trim() : '';
+    });
+    return registro;
+  });
+}
+
+function importarEstudiantes(event) {
+  if (!exigirPermisoEdicion('estudiantes')) {
+    event.target.value = '';
+    return;
+  }
+  const archivo = event.target.files[0];
+  if (!archivo) return;
+  const lector = new FileReader();
+  lector.onload = carga => {
+    try {
+      const filas = leerCSV(carga.target.result);
+      const registros = mapearFilaCSV(filas, [
+        { encabezado: 'Nombre Completo', campo: 'nombre' }
+      ]);
+      let agregados = 0;
+      registros.forEach(registro => {
+        if (!registro.nombre) return;
+        datos.estudiantes.push({
+          id: Date.now() + agregados,
+          nombre: registro.nombre,
+          edad: '',
+          sexo: 'No especificado',
+          curso: 'Sin asignar',
+          maestro: '',
+          responsable: '',
+          telefono: '',
+          alergias: 'Ninguna',
+          observaciones: '',
+          fechaRegistro: new Date().toISOString()
+        });
+        agregados++;
+      });
+      guardarDatos(datos);
+      renderEstudiantes();
+      actualizarCursos();
+      alert(`✅ Importación completada: ${agregados} estudiante(s) agregado(s).`);
+    } catch (error) {
+      alert('❌ No se pudo leer el archivo CSV.');
+    } finally {
+      event.target.value = '';
+    }
+  };
+  lector.readAsText(archivo, 'UTF-8');
+}
+
+function importarPersonal(event) {
+  if (!exigirPermisoEdicion('personal')) {
+    event.target.value = '';
+    return;
+  }
+  const archivo = event.target.files[0];
+  if (!archivo) return;
+  const lector = new FileReader();
+  lector.onload = carga => {
+    try {
+      const filas = leerCSV(carga.target.result);
+      const registros = mapearFilaCSV(filas, [
+        { encabezado: 'Nombre Completo', campo: 'nombre' }
+      ]);
+      let agregados = 0;
+      registros.forEach(registro => {
+        if (!registro.nombre) return;
+        datos.personal.push({
+          id: Date.now() + agregados,
+          nombre: registro.nombre,
+          tipo: 'Otro',
+          cargo: '',
+          area: '',
+          telefono: '',
+          alergias: 'Ninguna',
+          observaciones: '',
+          fechaRegistro: new Date().toISOString()
+        });
+        agregados++;
+      });
+      guardarDatos(datos);
+      renderPersonal();
+      alert(`✅ Importación completada: ${agregados} persona(s) agregada(s).`);
+    } catch (error) {
+      alert('❌ No se pudo leer el archivo CSV.');
+    } finally {
+      event.target.value = '';
+    }
+  };
+  lector.readAsText(archivo, 'UTF-8');
+}
+
+async function guardarEstudiante(e) {
+  e.preventDefault();
+  if (!exigirPermisoEdicion('estudiantes')) return;
+  const formulario = document.getElementById('formEstudiante');
+  const idEdicion = formulario.dataset.editId;
+  const estudianteExistente = idEdicion
+    ? datos.estudiantes.find(item => String(item.id) === idEdicion)
+    : null;
+  if (idEdicion && !estudianteExistente) {
+    alert('No se encontró el estudiante que desea editar.');
+    return;
+  }
+  const estudiante = {
+    id: estudianteExistente ? estudianteExistente.id : Date.now(),
+    nombre: document.getElementById('est_nombre').value,
+    edad: document.getElementById('est_edad').value,
+    sexo: document.getElementById('est_sexo').value,
+    curso: document.getElementById('est_curso').value,
+    maestro: document.getElementById('est_maestro').value,
+    responsable: document.getElementById('est_responsable').value,
+    telefono: document.getElementById('est_telefono').value,
+    alergias: document.getElementById('est_alergias').value,
+    observaciones: document.getElementById('est_observaciones').value,
+    fechaRegistro: estudianteExistente ? estudianteExistente.fechaRegistro : new Date().toISOString()
+  };
+  const indiceExistente = estudianteExistente ? datos.estudiantes.indexOf(estudianteExistente) : -1;
+  if (estudianteExistente) {
+    datos.estudiantes[indiceExistente] = estudiante;
+  } else {
+    datos.estudiantes.push(estudiante);
+  }
+  try {
+    await guardarDatosConfirmado(datos);
+  } catch (error) {
+    if (estudianteExistente) {
+      datos.estudiantes[indiceExistente] = estudianteExistente;
+    } else {
+      datos.estudiantes = datos.estudiantes.filter(item => item !== estudiante);
+    }
+    console.error('Error guardando estudiante:', error);
+    alert(`No se pudo guardar el estudiante: ${error.message || 'Error de permisos o conexión'}`);
+    renderEstudiantes();
+    return;
+  }
+  delete formulario.dataset.editId;
+  alert(estudianteExistente ? '✅ Estudiante actualizado correctamente' : '✅ Estudiante registrado correctamente');
+  formulario.reset();
+  formulario.querySelector('button[type="submit"]').textContent = '💾 Guardar Estudiante';
+  renderEstudiantes();
+  actualizarCursos();
+}
+
+function cancelarEdicionEstudiante() {
+  const formulario = document.getElementById('formEstudiante');
+  delete formulario.dataset.editId;
+  formulario.querySelector('button[type="submit"]').textContent = '💾 Guardar Estudiante';
+}
+
+function renderEstudiantes() {
+  const tbody = document.getElementById('cuerpoEstudiantes');
+  tbody.innerHTML = '';
+  datos.estudiantes.forEach(e => {
+    tbody.innerHTML += `
+      <tr>
+        <td><strong>${e.nombre}</strong></td>
+        <td>${e.edad}</td>
+        <td>${e.sexo}</td>
+        <td><span class="badge badge-azul">${e.curso}</span></td>
+        <td>${e.maestro || '-'}</td>
+        <td>${e.alergias || 'Ninguna'}</td>
+        <td>
+          <button class="btn btn-primary btn-sm" onclick="verFichaEstudiante(${argumentoIdHTML(e.id)})">👁️ Ver</button>
+          <button class="btn btn-warning btn-sm" onclick="editarEstudiante(${argumentoIdHTML(e.id)})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarEstudiante(${argumentoIdHTML(e.id)})">🗑️</button>
+        </td>
+      </tr>
+    `;
+  });
+  if (datos.estudiantes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">No hay estudiantes registrados</td></tr>';
+  }
+}
+
+function filtrarEstudiantes() {
+  const busqueda = document.getElementById('buscarEstudiante').value.toLowerCase();
+  const curso = document.getElementById('filtroCurso').value;
+  const filas = document.querySelectorAll('#cuerpoEstudiantes tr');
+  filas.forEach(f => {
+    const texto = f.textContent.toLowerCase();
+    const coincideCurso = !curso || f.children[3].textContent.includes(curso);
+    f.style.display = (texto.includes(busqueda) && coincideCurso) ? '' : 'none';
+  });
+}
+
+function actualizarCursos() {
+  const select = document.getElementById('filtroCurso');
+  const cursos = [...new Set(datos.estudiantes.map(e => e.curso))];
+  select.innerHTML = '<option value="">Todos los cursos</option>';
+  cursos.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
+}
+
+function verFichaEstudiante(id) {
+  const e = datos.estudiantes.find(x => String(x.id) === String(id));
+  if (!e) return;
+  const atenciones = datos.atenciones.filter(a => String(a.pacienteId) === String(id) && a.tipo === 'estudiante');
+  document.getElementById('contenidoFicha').innerHTML = `
+    <h2>👨‍🎓 Ficha del Estudiante</h2>
+    <div class="signos-grid" style="margin-bottom:15px;">
+      <div class="signo-item"><div class="label">Nombre</div><div class="valor" style="font-size:14px;">${e.nombre}</div></div>
+      <div class="signo-item"><div class="label">Edad</div><div class="valor">${e.edad}</div></div>
+      <div class="signo-item"><div class="label">Sexo</div><div class="valor" style="font-size:14px;">${e.sexo}</div></div>
+      <div class="signo-item"><div class="label">Curso</div><div class="valor" style="font-size:14px;">${e.curso}</div></div>
+    </div>
+    <h3>📝 Información General</h3>
+    <p><strong>Maestro:</strong> ${e.maestro || '-'}</p>
+    <p><strong>Responsable:</strong> ${e.responsable || '-'} ${e.telefono ? '(' + e.telefono + ')' : ''}</p>
+    <p><strong>Alergias:</strong> ${e.alergias || 'Ninguna'}</p>
+    <p><strong>Observaciones:</strong> ${e.observaciones || 'Ninguna'}</p>
+    <h3>🩺 Historial de Atenciones (${atenciones.length})</h3>
+    ${atenciones.length === 0 ? '<p style="color:#999;">Sin atenciones registradas</p>' : 
+      atenciones.map(a => `
+        <div class="historial-item">
+          <div class="fecha">${new Date(a.fecha).toLocaleString('es-ES')}</div>
+          <div class="contenido"><strong>Motivo:</strong> ${a.motivo}</div>
+          ${a.pa || a.fc || a.fr || a.temp || a.sat ? `
+            <div class="signos-grid" style="margin-top:8px;">
+              ${a.pa ? `<div class="signo-item"><div class="label">PA</div><div class="valor" style="font-size:14px;">${a.pa}</div></div>` : ''}
+              ${a.fc ? `<div class="signo-item"><div class="label">FC</div><div class="valor" style="font-size:14px;">${a.fc}</div></div>` : ''}
+              ${a.fr ? `<div class="signo-item"><div class="label">FR</div><div class="valor" style="font-size:14px;">${a.fr}</div></div>` : ''}
+              ${a.temp ? `<div class="signo-item"><div class="label">Temp</div><div class="valor" style="font-size:14px;">${a.temp}°C</div></div>` : ''}
+              ${a.sat ? `<div class="signo-item"><div class="label">Sat</div><div class="valor" style="font-size:14px;">${a.sat}%</div></div>` : ''}
+            </div>` : ''}
+          ${a.medicamentos && a.medicamentos.length > 0 ? `<div style="margin-top:8px;"><strong>Medicamentos:</strong> ${a.medicamentos.map(m => m.nombre + ' (' + m.cantidad + ')').join(', ')}</div>` : ''}
+          ${a.procedimiento ? `<div style="margin-top:5px;"><strong>Procedimiento:</strong> ${a.procedimiento}</div>` : ''}
+        </div>
+      `).join('')}
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalFicha')">Cerrar</button>
+    </div>
+  `;
+  document.getElementById('modalFicha').classList.add('activo');
+}
+
+function editarEstudiante(id) {
+  if (!exigirPermisoEdicion('estudiantes')) return;
+  const e = datos.estudiantes.find(x => String(x.id) === String(id));
+  if (!e) return;
+  const formulario = document.getElementById('formEstudiante');
+  formulario.dataset.editId = String(e.id);
+  document.getElementById('est_nombre').value = e.nombre;
+  document.getElementById('est_edad').value = e.edad;
+  document.getElementById('est_sexo').value = e.sexo;
+  document.getElementById('est_curso').value = e.curso;
+  document.getElementById('est_maestro').value = e.maestro || '';
+  document.getElementById('est_responsable').value = e.responsable || '';
+  document.getElementById('est_telefono').value = e.telefono || '';
+  document.getElementById('est_alergias').value = e.alergias || '';
+  document.getElementById('est_observaciones').value = e.observaciones || '';
+  formulario.querySelector('button[type="submit"]').textContent = '💾 Guardar Cambios';
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+async function eliminarEstudiante(id) {
+  if (!exigirPermisoEdicion('estudiantes')) return;
+  if (!confirm('¿Está seguro de eliminar este estudiante?')) return;
+  try {
+    await eliminarRegistroSupabase('students', id);
+  } catch (error) {
+    console.error('Error eliminando estudiante:', error);
+    alert(`No se pudo eliminar el estudiante: ${error.message || 'Error de permisos o conexión'}`);
+    return;
+  }
+  datos.estudiantes = datos.estudiantes.filter(e => String(e.id) !== String(id));
+  guardarDatos(datos);
+  renderEstudiantes();
+  actualizarCursos();
+}
+
+// ============ PERSONAL ============
+async function guardarPersonal(e) {
+  e.preventDefault();
+  if (!exigirPermisoEdicion('personal')) return;
+  const formulario = document.getElementById('formPersonal');
+  const idEdicion = formulario.dataset.editId;
+  const personalExistente = idEdicion
+    ? datos.personal.find(item => String(item.id) === idEdicion)
+    : null;
+  if (idEdicion && !personalExistente) {
+    alert('No se encontró el registro que desea editar.');
+    return;
+  }
+  const p = {
+    id: personalExistente ? personalExistente.id : Date.now(),
+    nombre: document.getElementById('per_nombre').value,
+    tipo: document.getElementById('per_tipo').value,
+    cargo: document.getElementById('per_cargo').value,
+    area: document.getElementById('per_area').value,
+    telefono: document.getElementById('per_telefono').value,
+    alergias: document.getElementById('per_alergias').value,
+    observaciones: document.getElementById('per_observaciones').value,
+    fechaRegistro: personalExistente ? personalExistente.fechaRegistro : new Date().toISOString()
+  };
+  const indiceExistente = personalExistente ? datos.personal.indexOf(personalExistente) : -1;
+  if (personalExistente) {
+    datos.personal[indiceExistente] = p;
+  } else {
+    datos.personal.push(p);
+  }
+  try {
+    await guardarDatosConfirmado(datos);
+  } catch (error) {
+    if (personalExistente) {
+      datos.personal[indiceExistente] = personalExistente;
+    } else {
+      datos.personal = datos.personal.filter(item => item !== p);
+    }
+    console.error('Error guardando registro de personal:', error);
+    alert(`No se pudo guardar el registro: ${error.message || 'Error de permisos o conexión'}`);
+    renderPersonal();
+    return;
+  }
+  delete formulario.dataset.editId;
+  alert(personalExistente ? '✅ Registro actualizado correctamente' : '✅ Personal registrado correctamente');
+  formulario.reset();
+  formulario.querySelector('button[type="submit"]').textContent = '💾 Guardar Personal';
+  renderPersonal();
+}
+
+function cancelarEdicionPersonal() {
+  const formulario = document.getElementById('formPersonal');
+  delete formulario.dataset.editId;
+  formulario.querySelector('button[type="submit"]').textContent = '💾 Guardar Personal';
+}
+
+function renderPersonal() {
+  const tbody = document.getElementById('cuerpoPersonal');
+  tbody.innerHTML = '';
+  datos.personal.forEach(p => {
+    tbody.innerHTML += `
+      <tr>
+        <td><strong>${p.nombre}</strong></td>
+        <td><span class="badge badge-verde">${p.tipo}</span></td>
+        <td>${p.cargo || '-'}</td>
+        <td>${p.area || '-'}</td>
+        <td>${p.telefono || '-'}</td>
+        <td>
+          <button class="btn btn-primary btn-sm" onclick="verFichaPersonal(${argumentoIdHTML(p.id)})">👁️ Ver</button>
+          <button class="btn btn-warning btn-sm" onclick="editarPersonal(${argumentoIdHTML(p.id)})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarPersonal(${argumentoIdHTML(p.id)})">🗑️</button>
+        </td>
+      </tr>
+    `;
+  });
+  if (datos.personal.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#999; padding:20px;">No hay personal registrado</td></tr>';
+  }
+}
+
+function filtrarPersonal() {
+  const busqueda = document.getElementById('buscarPersonal').value.toLowerCase();
+  const tipo = document.getElementById('filtroTipo').value;
+  const filas = document.querySelectorAll('#cuerpoPersonal tr');
+  filas.forEach(f => {
+    const texto = f.textContent.toLowerCase();
+    const coincideTipo = !tipo || f.children[1].textContent.includes(tipo);
+    f.style.display = (texto.includes(busqueda) && coincideTipo) ? '' : 'none';
+  });
+}
+
+function verFichaPersonal(id) {
+  const p = datos.personal.find(x => String(x.id) === String(id));
+  if (!p) return;
+  const atenciones = datos.atenciones.filter(a => String(a.pacienteId) === String(id) && a.tipo === 'personal');
+  document.getElementById('contenidoFicha').innerHTML = `
+    <h2>👥 Ficha del Personal</h2>
+    <div class="signos-grid" style="margin-bottom:15px;">
+      <div class="signo-item"><div class="label">Nombre</div><div class="valor" style="font-size:14px;">${p.nombre}</div></div>
+      <div class="signo-item"><div class="label">Tipo</div><div class="valor" style="font-size:14px;">${p.tipo}</div></div>
+      <div class="signo-item"><div class="label">Cargo</div><div class="valor" style="font-size:14px;">${p.cargo || '-'}</div></div>
+      <div class="signo-item"><div class="label">Área</div><div class="valor" style="font-size:14px;">${p.area || '-'}</div></div>
+    </div>
+    <h3>📝 Información General</h3>
+    <p><strong>Teléfono:</strong> ${p.telefono || '-'}</p>
+    <p><strong>Alergias:</strong> ${p.alergias || 'Ninguna'}</p>
+    <p><strong>Observaciones:</strong> ${p.observaciones || 'Ninguna'}</p>
+    <h3>🩺 Historial de Atenciones (${atenciones.length})</h3>
+    ${atenciones.length === 0 ? '<p style="color:#999;">Sin atenciones registradas</p>' : 
+      atenciones.map(a => `
+        <div class="historial-item">
+          <div class="fecha">${new Date(a.fecha).toLocaleString('es-ES')}</div>
+          <div class="contenido"><strong>Motivo:</strong> ${a.motivo}</div>
+          ${a.medicamentos && a.medicamentos.length > 0 ? `<div style="margin-top:8px;"><strong>Medicamentos:</strong> ${a.medicamentos.map(m => m.nombre + ' (' + m.cantidad + ')').join(', ')}</div>` : ''}
+        </div>
+      `).join('')}
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalFicha')">Cerrar</button>
+    </div>
+  `;
+  document.getElementById('modalFicha').classList.add('activo');
+}
+
+function editarPersonal(id) {
+  if (!exigirPermisoEdicion('personal')) return;
+  const p = datos.personal.find(x => String(x.id) === String(id));
+  if (!p) return;
+  const formulario = document.getElementById('formPersonal');
+  formulario.dataset.editId = String(p.id);
+  document.getElementById('per_nombre').value = p.nombre;
+  document.getElementById('per_tipo').value = p.tipo;
+  document.getElementById('per_cargo').value = p.cargo || '';
+  document.getElementById('per_area').value = p.area || '';
+  document.getElementById('per_telefono').value = p.telefono || '';
+  document.getElementById('per_alergias').value = p.alergias || '';
+  document.getElementById('per_observaciones').value = p.observaciones || '';
+  formulario.querySelector('button[type="submit"]').textContent = '💾 Guardar Cambios';
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+async function eliminarPersonal(id) {
+  if (!exigirPermisoEdicion('personal')) return;
+  if (!confirm('¿Está seguro de eliminar este registro?')) return;
+  try {
+    await eliminarRegistroSupabase('staff', id);
+  } catch (error) {
+    console.error('Error eliminando registro de personal:', error);
+    alert(`No se pudo eliminar el registro: ${error.message || 'Error de permisos o conexión'}`);
+    return;
+  }
+  datos.personal = datos.personal.filter(p => String(p.id) !== String(id));
+  guardarDatos(datos);
+  renderPersonal();
+}
+
+// ============ MEDICAMENTOS ============
+function renderMedicamentos() {
+  verificarResetDiario();
+  const grid = document.getElementById('gridMedicamentos');
+  grid.innerHTML = '';
+  datos.medicamentos.forEach((m, i) => {
+    const disponible = m.dosisDiaria + m.acumulado;
+    const porcentaje = Math.min(100, (m.stock / 200) * 100);
+    const claseBarra = porcentaje < 20 ? 'bajo' : porcentaje < 50 ? 'medio' : '';
+    grid.innerHTML += `
+      <div class="med-card">
+        <h4>💊 ${m.nombre}</h4>
+        <div class="med-info"><span>Stock total:</span> <strong>${m.stock}</strong></div>
+        <div class="med-info"><span>Dosis diaria:</span> <strong>${m.dosisDiaria}</strong></div>
+        <div class="med-info"><span>Acumulado:</span> <strong>${m.acumulado}</strong></div>
+        <div class="med-info"><span>Disponible hoy:</span> <strong style="color:#43a047;">${disponible}</strong></div>
+        <div class="med-info"><span>Consumido hoy:</span> <strong style="color:#fb8c00;">${m.consumidoHoy}</strong></div>
+        <div class="barra"><div class="barra-fill ${claseBarra}" style="width:${porcentaje}%"></div></div>
+        <div class="btn-group" style="margin-top:10px;">
+          <button class="btn btn-success btn-sm" onclick="administrarMedicamento(${i})">💉 Administrar</button>
+          <button class="btn btn-primary btn-sm" onclick="abrirModalMedicamento(${i})">✏️ Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarMedicamento(${i})">🗑️ Eliminar</button>
+        </div>
+      </div>
+    `;
+  });
+  renderConsumoDiario();
+}
+
+function abrirModalMedicamento(idx = null) {
+  const formulario = document.getElementById('formMedicamento');
+  formulario.reset();
+  document.getElementById('med_id').value = idx === null ? '' : idx;
+  document.getElementById('tituloModalMedicamento').textContent =
+    idx === null ? '➕ Agregar Medicamento' : '✏️ Editar Medicamento';
+  if (idx !== null) {
+    const medicamento = datos.medicamentos[idx];
+    if (!medicamento) return;
+    document.getElementById('med_nombre').value = medicamento.nombre;
+    document.getElementById('med_stock').value = medicamento.stock;
+    document.getElementById('med_dosis').value = medicamento.dosisDiaria;
+  }
+  document.getElementById('modalMedicamento').classList.add('activo');
+}
+
+function guardarMedicamento(e) {
+  e.preventDefault();
+  if (!exigirPermisoEdicion('medicamentos')) return;
+  const nombre = document.getElementById('med_nombre').value.trim();
+  const stock = Number(document.getElementById('med_stock').value);
+  const dosisDiaria = Number(document.getElementById('med_dosis').value);
+  const idx = document.getElementById('med_id').value;
+  if (!nombre || !Number.isInteger(stock) || stock < 0 ||
+      !Number.isInteger(dosisDiaria) || dosisDiaria < 1) {
+    alert('Ingrese un nombre, stock y dosis diaria válidos.');
+    return;
+  }
+
+  if (idx === '') {
+    datos.medicamentos.push({
+      nombre,
+      stock,
+      dosisDiaria,
+      consumidoHoy: 0,
+      acumulado: 0
+    });
+  } else {
+    const medicamento = datos.medicamentos[Number(idx)];
+    if (!medicamento) {
+      alert('No se encontró el medicamento que desea editar.');
+      return;
+    }
+    medicamento.nombre = nombre;
+    medicamento.stock = stock;
+    medicamento.dosisDiaria = dosisDiaria;
+  }
+
+  guardarDatos(datos);
+  cerrarModal('modalMedicamento');
+  renderMedicamentos();
+}
+
+async function eliminarMedicamento(idx) {
+  if (!exigirPermisoEdicion('medicamentos')) return;
+  const medicamento = datos.medicamentos[idx];
+  if (!medicamento) return;
+  if (!confirm(`¿Eliminar ${medicamento.nombre} del inventario? Los registros históricos se conservarán.`)) return;
+  try {
+    await eliminarRegistroSupabase('medications', medicamento.id);
+  } catch (error) {
+    console.error('Error eliminando medicamento:', error);
+    alert(`No se pudo eliminar el medicamento: ${error.message || 'Error de permisos o conexión'}`);
+    return;
+  }
+  datos.medicamentos.splice(idx, 1);
+  guardarDatos(datos);
+  renderMedicamentos();
+}
+
+function renderConsumoDiario() {
+  const div = document.getElementById('consumoDiario');
+  div.innerHTML = `
+    <table>
+      <thead>
+        <tr><th>Medicamento</th><th>Asignado Hoy</th><th>Consumido</th><th>Restante</th><th>Estado</th></tr>
+      </thead>
+      <tbody>
+        ${datos.medicamentos.map(m => {
+          const asignado = m.dosisDiaria + m.acumulado;
+          const restante = asignado - m.consumidoHoy;
+          const estado = m.consumidoHoy === 0 ? '<span class="badge badge-verde">Sin uso</span>' :
+                         restante === 0 ? '<span class="badge badge-rojo">Agotado</span>' :
+                         '<span class="badge badge-naranja">En uso</span>';
+          return `<tr><td>${m.nombre}</td><td>${asignado}</td><td>${m.consumidoHoy}</td><td>${restante}</td><td>${estado}</td></tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function administrarMedicamento(idx) {
+  const cantidad = parseInt(prompt(`¿Cuántas unidades de ${datos.medicamentos[idx].nombre} va a administrar?`));
+  if (!cantidad || cantidad < 1) return;
+  const m = datos.medicamentos[idx];
+  const disponible = m.dosisDiaria + m.acumulado;
+  if (m.consumidoHoy + cantidad > disponible) {
+    alert(`⚠️ Solo hay ${disponible - m.consumidoHoy} unidades disponibles hoy`);
+    return;
+  }
+  if (m.stock < cantidad) {
+    alert(`⚠️ Stock insuficiente. Solo quedan ${m.stock} unidades en inventario`);
+    return;
+  }
+  m.consumidoHoy += cantidad;
+  m.stock -= cantidad;
+  if (m.acumulado > 0) {
+    const usadoAcumulado = Math.min(m.acumulado, cantidad);
+    m.acumulado -= usadoAcumulado;
+  }
+  guardarDatos(datos);
+  alert(`✅ Administradas ${cantidad} unidades de ${m.nombre}`);
+  renderMedicamentos();
+}
+
+function editarDosis(idx) {
+  if (!exigirPermisoEdicion('medicamentos')) return;
+  const nueva = parseInt(prompt(`Nueva dosis diaria para ${datos.medicamentos[idx].nombre}:`, datos.medicamentos[idx].dosisDiaria));
+  if (nueva && nueva > 0) {
+    datos.medicamentos[idx].dosisDiaria = nueva;
+    guardarDatos(datos);
+    renderMedicamentos();
+  }
+}
+
+function abrirModalReposicion() {
+  const select = document.getElementById('rep_medicamento');
+  select.innerHTML = datos.medicamentos.map((m, i) => `<option value="${i}">${m.nombre} (Stock: ${m.stock})</option>`).join('');
+  document.getElementById('modalReposicion').classList.add('activo');
+}
+
+function guardarReposicion() {
+  if (!exigirPermisoEdicion('medicamentos')) return;
+  const idx = parseInt(document.getElementById('rep_medicamento').value);
+  const cantidad = parseInt(document.getElementById('rep_cantidad').value);
+  const obs = document.getElementById('rep_obs').value;
+  if (!cantidad || cantidad < 1) { alert('Ingrese una cantidad válida'); return; }
+  datos.medicamentos[idx].stock += cantidad;
+  datos.reposiciones.push({
+    fecha: new Date().toISOString(),
+    medicamento: datos.medicamentos[idx].nombre,
+    cantidad: cantidad,
+    observaciones: obs
+  });
+  guardarDatos(datos);
+  alert(`✅ Agregadas ${cantidad} unidades a ${datos.medicamentos[idx].nombre}`);
+  cerrarModal('modalReposicion');
+  document.getElementById('rep_obs').value = '';
+  renderMedicamentos();
+}
+
+function resetearConsumoDiario() {
+  if (!confirm('¿Resetear el consumo del día? Los no consumidos se acumularán al día siguiente.')) return;
+  datos.medicamentos.forEach(m => {
+    const disponible = m.dosisDiaria + m.acumulado;
+    const noUsado = disponible - m.consumidoHoy;
+    m.acumulado = Math.max(0, noUsado);
+    m.consumidoHoy = 0;
+  });
+  datos.ultimoReset = new Date().toDateString();
+  guardarDatos(datos);
+  renderMedicamentos();
+  alert('✅ Consumo del día reseteado');
+}
+
+function verHistorialConsumo() {
+  const div = document.getElementById('consumoDiario');
+  if (datos.historialConsumo.length === 0) {
+    div.innerHTML = '<p style="color:#999; text-align:center;">No hay historial de consumo aún</p>';
+    return;
+  }
+  div.innerHTML = `
+    <h3>📊 Historial de Consumo</h3>
+    <table>
+      <thead><tr><th>Fecha</th><th>Medicamento</th><th>Consumido</th><th>Acumulado</th></tr></thead>
+      <tbody>
+        ${datos.historialConsumo.slice().reverse().map(h => 
+          `<tr><td>${h.fecha}</td><td>${h.nombre}</td><td>${h.consumido}</td><td>${h.acumulado}</td></tr>`
+        ).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// ============ ATENCIONES ============
+function cambiarTipoAtencion(tipo, btn) {
+  document.querySelectorAll('.tab-interna').forEach(b => b.classList.remove('activa'));
+  btn.classList.add('activa');
+  document.getElementById('at_tipo').value = tipo;
+  cargarPacientesAtencion();
+}
+
+function cargarPacientesAtencion() {
+  const tipo = document.getElementById('at_tipo').value;
+  const select = document.getElementById('at_paciente');
+  const lista = tipo === 'estudiante' ? datos.estudiantes : datos.personal;
+  select.innerHTML = '<option value="">Seleccionar paciente</option>';
+  lista.forEach(p => {
+    const info = tipo === 'estudiante' ? `(${p.curso})` : `(${p.tipo})`;
+    select.innerHTML += `<option value="${p.id}">${p.nombre} ${info}</option>`;
+  });
+  renderMedicamentosAtencion();
+  const ahora = new Date();
+  ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+  document.getElementById('at_fecha').value = ahora.toISOString().slice(0, 16);
+}
+
+function renderMedicamentosAtencion() {
+  const div = document.getElementById('medicamentosAtencion');
+  div.innerHTML = datos.medicamentos.map((m, i) => {
+    const disponible = m.dosisDiaria + m.acumulado - m.consumidoHoy;
+    return `
+      <div class="form-grid" style="margin-bottom:10px; align-items:end;">
+        <div class="form-group">
+          <label>${m.nombre} (Disponible: ${disponible})</label>
+          <input type="number" min="0" max="${disponible}" value="0" data-med-idx="${i}" class="med-atencion-input">
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function cargarDatosPaciente() {
+  // Se puede usar para cargar info adicional si se requiere
+}
+
+function guardarAtencion(e) {
+  e.preventDefault();
+  if (!exigirPermisoEdicion('atenciones')) return;
+  const tipo = document.getElementById('at_tipo').value;
+  const pacienteId = document.getElementById('at_paciente').value;
+  const lista = tipo === 'estudiante' ? datos.estudiantes : datos.personal;
+  const paciente = lista.find(p => String(p.id) === String(pacienteId));
+  if (!paciente) { alert('Seleccione un paciente'); return; }
+
+  const medicamentos = [];
+  document.querySelectorAll('.med-atencion-input').forEach(input => {
+    const cantidad = parseInt(input.value);
+    if (cantidad > 0) {
+      const idx = parseInt(input.dataset.medIdx);
+      medicamentos.push({
+        nombre: datos.medicamentos[idx].nombre,
+        cantidad: cantidad,
+        idx: idx
+      });
+    }
+  });
+
+  // Validar y descontar stock
+  for (const med of medicamentos) {
+    const m = datos.medicamentos[med.idx];
+    const disponible = m.dosisDiaria + m.acumulado - m.consumidoHoy;
+    if (med.cantidad > disponible) {
+      alert(`⚠️ No hay suficiente ${m.nombre} disponible hoy. Solo quedan ${disponible} unidades.`);
+      return;
+    }
+    if (med.cantidad > m.stock) {
+      alert(`⚠️ Stock insuficiente de ${m.nombre}. Solo quedan ${m.stock} unidades.`);
+      return;
+    }
+  }
+
+  const atencion = {
+    id: Date.now(),
+    tipo: tipo,
+    pacienteId: pacienteId,
+    pacienteNombre: paciente.nombre,
+    pacienteInfo: tipo === 'estudiante' ? paciente.curso : paciente.tipo,
+    fecha: document.getElementById('at_fecha').value || new Date().toISOString(),
+    motivo: document.getElementById('at_motivo').value,
+    pa: document.getElementById('at_pa').value,
+    fc: document.getElementById('at_fc').value,
+    fr: document.getElementById('at_fr').value,
+    temp: document.getElementById('at_temp').value,
+    sat: document.getElementById('at_sat').value,
+    medicamentos: medicamentos,
+    procedimiento: document.getElementById('at_procedimiento').value,
+    registradoPor: datos.config.enfermero || 'Enfermería'
+  };
+
+  // Descontar medicamentos
+  medicamentos.forEach(med => {
+    const m = datos.medicamentos[med.idx];
+    m.consumidoHoy += med.cantidad;
+    m.stock -= med.cantidad;
+  });
+
+  datos.atenciones.push(atencion);
+  guardarDatos(datos);
+  alert('✅ Atención registrada correctamente');
+  document.getElementById('formAtencion').reset();
+  cargarPacientesAtencion();
+  renderAtenciones();
+}
+
+function renderAtenciones() {
+  const div = document.getElementById('listaAtenciones');
+  if (datos.atenciones.length === 0) {
+    div.innerHTML = '<p style="color:#999; text-align:center; padding:20px;">No hay atenciones registradas</p>';
+    return;
+  }
+  const atencionesOrdenadas = datos.atenciones.slice().reverse();
+  div.innerHTML = atencionesOrdenadas.map(a => `
+    <div class="historial-item">
+      <div style="display:flex; justify-content:space-between; align-items:start; flex-wrap:wrap;">
+        <div>
+          <strong>${a.pacienteNombre}</strong> <span class="badge ${a.tipo === 'estudiante' ? 'badge-azul' : 'badge-verde'}">${a.pacienteInfo}</span>
+          <span class="badge ${a.tipo === 'estudiante' ? 'badge-azul' : 'badge-verde'}">${a.tipo === 'estudiante' ? 'Estudiante' : 'Personal'}</span>
+        </div>
+        <div class="fecha">${new Date(a.fecha).toLocaleString('es-ES')}</div>
+      </div>
+      <div class="contenido"><strong>Motivo:</strong> ${a.motivo}</div>
+      ${a.pa || a.fc || a.fr || a.temp || a.sat ? `
+        <div class="signos-grid" style="margin-top:8px;">
+          ${a.pa ? `<div class="signo-item"><div class="label">PA</div><div class="valor" style="font-size:14px;">${a.pa}</div></div>` : ''}
+          ${a.fc ? `<div class="signo-item"><div class="label">FC</div><div class="valor" style="font-size:14px;">${a.fc}</div></div>` : ''}
+          ${a.fr ? `<div class="signo-item"><div class="label">FR</div><div class="valor" style="font-size:14px;">${a.fr}</div></div>` : ''}
+          ${a.temp ? `<div class="signo-item"><div class="label">Temp</div><div class="valor" style="font-size:14px;">${a.temp}°C</div></div>` : ''}
+          ${a.sat ? `<div class="signo-item"><div class="label">Sat</div><div class="valor" style="font-size:14px;">${a.sat}%</div></div>` : ''}
+        </div>` : ''}
+      ${a.medicamentos && a.medicamentos.length > 0 ? `<div style="margin-top:8px;"><strong>💊 Medicamentos:</strong> ${a.medicamentos.map(m => m.nombre + ' (' + m.cantidad + ')').join(', ')}</div>` : ''}
+      ${a.procedimiento ? `<div style="margin-top:5px;"><strong>📋 Procedimiento:</strong> ${a.procedimiento}</div>` : ''}
+      <div class="btn-group">
+        <button class="btn btn-danger btn-sm" onclick="eliminarAtencion(${argumentoIdHTML(a.id)})">🗑️ Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filtrarAtenciones() {
+  const busqueda = document.getElementById('buscarAtencion').value.toLowerCase();
+  const fecha = document.getElementById('filtroFechaAtencion').value;
+  const tipo = document.getElementById('filtroTipoAtencion').value;
+  const items = document.querySelectorAll('#listaAtenciones .historial-item');
+  items.forEach(item => {
+    const texto = item.textContent.toLowerCase();
+    const coincideFecha = !fecha || item.querySelector('.fecha').textContent.includes(new Date(fecha).toLocaleDateString('es-ES'));
+    const coincideTipo = !tipo || item.innerHTML.includes(`badge-${tipo === 'estudiante' ? 'azul' : 'verde'}`);
+    item.style.display = (texto.includes(busqueda) && coincideFecha && coincideTipo) ? '' : 'none';
+  });
+}
+
+async function eliminarAtencion(id) {
+  if (!exigirPermisoEdicion('atenciones')) return;
+  if (!confirm('¿Eliminar esta atención?')) return;
+  try {
+    await eliminarRegistroSupabase('attentions', id);
+  } catch (error) {
+    console.error('Error eliminando atención:', error);
+    alert(`No se pudo eliminar la atención: ${error.message || 'Error de permisos o conexión'}`);
+    return;
+  }
+  datos.atenciones = datos.atenciones.filter(a => String(a.id) !== String(id));
+  guardarDatos(datos);
+  renderAtenciones();
+}
+
+// ============ DASHBOARD ============
+function actualizarDashboard() {
+  document.getElementById('totalEstudiantes').textContent = datos.estudiantes.length;
+  document.getElementById('totalPersonal').textContent = datos.personal.length;
+  const hoy = new Date().toDateString();
+  const atencionesHoy = datos.atenciones.filter(a => new Date(a.fecha).toDateString() === hoy).length;
+  document.getElementById('atencionesHoy').textContent = atencionesHoy;
+  const medsBajos = datos.medicamentos.filter(m => m.stock < 20).length;
+  document.getElementById('medsBajos').textContent = medsBajos;
+  document.getElementById('totalAtenciones').textContent = datos.atenciones.length;
+
+  // Resumen del día
+  const resumen = document.getElementById('resumenDia');
+  if (atencionesHoy === 0 && medsBajos === 0) {
+    resumen.innerHTML = '<div class="alerta alerta-success">✅ Todo en orden. No hay incidencias pendientes.</div>';
+  } else {
+    let html = '';
+    if (atencionesHoy > 0) html += `<div class="alerta alerta-info">📋 Se han registrado ${atencionesHoy} atención(es) el día de hoy.</div>`;
+    if (medsBajos > 0) html += `<div class="alerta alerta-warning">⚠️ Hay ${medsBajos} medicamento(s) con stock bajo. Se requiere reposición.</div>`;
+    resumen.innerHTML = html;
+  }
+
+  // Últimas atenciones
+  const ultimas = document.getElementById('ultimasAtenciones');
+  const ultimasArr = datos.atenciones.slice(-5).reverse();
+  if (ultimasArr.length === 0) {
+    ultimas.innerHTML = '<p style="color:#999; text-align:center; padding:20px;">No hay atenciones registradas aún</p>';
+  } else {
+    ultimas.innerHTML = ultimasArr.map(a => `
+      <div class="historial-item">
+        <div style="display:flex; justify-content:space-between;">
+          <strong>${a.pacienteNombre}</strong>
+          <span class="fecha">${new Date(a.fecha).toLocaleString('es-ES')}</span>
+        </div>
+        <div class="contenido">${a.motivo}</div>
+      </div>
+    `).join('');
+  }
+}
+
+// ============ REPORTES ============
+function cargarPacientesReporte() {
+  const dataList = document.getElementById('listaPacientesReporte');
+  if (!dataList) return;
+  dataList.innerHTML = '';
+  datos.estudiantes.forEach(estudiante => {
+    const nombre = String(estudiante.nombre || '').trim();
+    if (nombre) dataList.innerHTML += `<option value="${escaparHTML(nombre)}" data-referencia="est-${estudiante.id}" label="Estudiante"></option>`;
+  });
+  datos.personal.forEach(miembro => {
+    const nombre = String(miembro.nombre || '').trim();
+    if (nombre) dataList.innerHTML += `<option value="${escaparHTML(nombre)}" data-referencia="per-${miembro.id}" label="Personal"></option>`;
+  });
+}
+
+function actualizarFormularioReportes() {
+  const esReporteIndividual = document.getElementById('tipoReporte').value === 'paciente';
+  document.getElementById('grupoPacienteReporte').style.display = esReporteIndividual ? '' : 'none';
+  document.getElementById('grupoFechaInicio').style.display = esReporteIndividual ? 'none' : '';
+  document.getElementById('grupoFechaFin').style.display = esReporteIndividual ? 'none' : '';
+  if (!esReporteIndividual) return;
+  if (document.getElementById('rep_paciente').value) generarReporte(false);
+  else {
+    document.getElementById('panelReporte').style.display = 'none';
+    document.getElementById('contenidoReporte').innerHTML = '';
+  }
+}
+
+function buscarPacienteReporte() {
+  const termino = document.getElementById('rep_buscarPaciente')?.value.trim() || '';
+  const normalizarTexto = valor => String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  const busqueda = normalizarTexto(termino);
+  const input = document.getElementById('rep_buscarPaciente');
+  const campoReferencia = document.getElementById('rep_paciente');
+  const dataList = document.getElementById('listaPacientesReporte');
+  if (!busqueda) {
+    cargarPacientesReporte();
+    campoReferencia.value = '';
+    document.getElementById('panelReporte').style.display = 'none';
+    document.getElementById('contenidoReporte').innerHTML = '';
+    return;
+  }
+
+  const coincidencias = [];
+  datos.estudiantes.forEach(estudiante => {
+    const nombre = String(estudiante.nombre || '').trim();
+    if (normalizarTexto(nombre).includes(busqueda)) coincidencias.push({ nombre, referencia: `est-${estudiante.id}` });
+  });
+  datos.personal.forEach(miembro => {
+    const nombre = String(miembro.nombre || '').trim();
+    if (normalizarTexto(nombre).includes(busqueda)) coincidencias.push({ nombre, referencia: `per-${miembro.id}` });
+  });
+  dataList.innerHTML = coincidencias.map(registro =>
+    `<option value="${escaparHTML(registro.nombre)}" data-referencia="${registro.referencia}"></option>`
+  ).join('');
+
+  campoReferencia.value = coincidencias.length === 1 ? coincidencias[0].referencia : '';
+  if (coincidencias.length === 1 && input.value === coincidencias[0].nombre) {
+    generarReporte(false);
+  }
+}
+
+function seleccionarPacienteReporte() {
+  const nombre = document.getElementById('rep_buscarPaciente')?.value.trim() || '';
+  const campoReferencia = document.getElementById('rep_paciente');
+  const coincidenciaEstudiante = datos.estudiantes.find(e => String(e.nombre || '').trim() === nombre);
+  const coincidenciaPersonal = datos.personal.find(p => String(p.nombre || '').trim() === nombre);
+  campoReferencia.value = coincidenciaEstudiante
+    ? `est-${coincidenciaEstudiante.id}`
+    : coincidenciaPersonal
+      ? `per-${coincidenciaPersonal.id}`
+      : '';
+  if (campoReferencia.value) generarReporte(false);
+}
+
+function escaparHTML(valor) {
+  return String(valor == null ? '' : valor).replace(/[&<>"']/g, caracter => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[caracter]);
+}
+
+function argumentoIdHTML(id) {
+  return escaparHTML(JSON.stringify(String(id)));
+}
+
+function encabezadoReporteInstitucional(escuela) {
+  return `
+    <div class="encabezado-reporte">
+      <img src="img/logo_enfermeria.png" alt="Logo de Enfermería" class="logo-enfermeria">
+      <div class="titulo-reporte">
+        <strong>${escaparHTML(escuela)}</strong>
+        <span>Sistema de Enfermería Escolar</span>
+      </div>
+      <img src="img/logo_salesiano.png" alt="Logo Salesiano" class="logo-salesiano">
+    </div>
+  `;
+}
+
+function generarReporte(mostrarError = true) {
+  const tipo = document.getElementById('tipoReporte').value;
+  const inicio = document.getElementById('rep_inicio').value;
+  const fin = document.getElementById('rep_fin').value;
+  const fechaInicio = inicio ? new Date(`${inicio}T00:00:00`) : null;
+  const fechaFin = fin ? new Date(`${fin}T23:59:59.999`) : null;
+  const paciente = document.getElementById('rep_paciente').value;
+  const panel = document.getElementById('panelReporte');
+  const contenido = document.getElementById('contenidoReporte');
+  panel.style.display = 'block';
+
+  let html = '';
+  const escuela = datos.config.escuela || 'Institución Educativa';
+
+  if (tipo === 'atenciones') {
+    let atenciones = datos.atenciones;
+    if (fechaInicio) atenciones = atenciones.filter(a => new Date(a.fecha) >= fechaInicio);
+    if (fechaFin) atenciones = atenciones.filter(a => new Date(a.fecha) <= fechaFin);
+    html = `
+      <h3>Reporte de Atenciones - ${escuela}</h3>
+      <p>Período: ${inicio || 'Inicio'} al ${fin || 'Hoy'} | Total: ${atenciones.length}</p>
+      <table>
+        <thead><tr><th>Fecha</th><th>Paciente</th><th>Tipo</th><th>Motivo</th><th>Medicamentos</th></tr></thead>
+        <tbody>
+          ${atenciones.map(a => `
+            <tr>
+              <td>${new Date(a.fecha).toLocaleString('es-ES')}</td>
+              <td>${a.pacienteNombre}</td>
+              <td>${a.tipo}</td>
+              <td>${a.motivo}</td>
+              <td>${a.medicamentos ? a.medicamentos.map(m => m.nombre + ' (' + m.cantidad + ')').join(', ') : '-'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } else if (tipo === 'estudiantes') {
+    html = `
+      <h3>Listado de Estudiantes - ${escuela}</h3>
+      <p>Total: ${datos.estudiantes.length}</p>
+      <table>
+        <thead><tr><th>Nombre</th><th>Edad</th><th>Sexo</th><th>Curso</th><th>Maestro</th><th>Alergias</th></tr></thead>
+        <tbody>
+          ${datos.estudiantes.map(e => `
+            <tr><td>${e.nombre}</td><td>${e.edad}</td><td>${e.sexo}</td><td>${e.curso}</td><td>${e.maestro || '-'}</td><td>${e.alergias || '-'}</td></tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } else if (tipo === 'personal') {
+    html = `
+      <h3>Listado de Personal - ${escuela}</h3>
+      <p>Total: ${datos.personal.length}</p>
+      <table>
+        <thead><tr><th>Nombre</th><th>Tipo</th><th>Cargo</th><th>Área</th><th>Teléfono</th></tr></thead>
+        <tbody>
+          ${datos.personal.map(p => `
+            <tr><td>${p.nombre}</td><td>${p.tipo}</td><td>${p.cargo || '-'}</td><td>${p.area || '-'}</td><td>${p.telefono || '-'}</td></tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } else if (tipo === 'medicamentos') {
+    html = `
+      <h3>Inventario de Medicamentos - ${escuela}</h3>
+      <p>Fecha: ${new Date().toLocaleDateString('es-ES')}</p>
+      <table>
+        <thead><tr><th>Medicamento</th><th>Stock</th><th>Dosis Diaria</th><th>Acumulado</th><th>Consumido Hoy</th></tr></thead>
+        <tbody>
+          ${datos.medicamentos.map(m => `
+            <tr><td>${m.nombre}</td><td>${m.stock}</td><td>${m.dosisDiaria}</td><td>${m.acumulado}</td><td>${m.consumidoHoy}</td></tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } else if (tipo === 'consumo') {
+    html = `
+      <h3>Historial de Consumo - ${escuela}</h3>
+      <table>
+        <thead><tr><th>Fecha</th><th>Medicamento</th><th>Consumido</th><th>Acumulado</th></tr></thead>
+        <tbody>
+          ${datos.historialConsumo.slice().reverse().map(h => `
+            <tr><td>${h.fecha}</td><td>${h.nombre}</td><td>${h.consumido}</td><td>${h.acumulado}</td></tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } else if (tipo === 'paciente') {
+    if (!paciente) {
+      panel.style.display = 'none';
+      contenido.innerHTML = '';
+      if (mostrarError) alert('Seleccione un estudiante o paciente para generar su reporte médico.');
+      return;
+    }
+    const [prefijoP, ...restoIdP] = paciente.split('-');
+    const idP = restoIdP.join('-');
+    const tipoP = prefijoP === 'est' ? 'estudiante' : 'personal';
+    const lista = tipoP === 'estudiante' ? datos.estudiantes : datos.personal;
+    const p = lista.find(x => String(x.id) === String(idP));
+    if (!p) {
+      alert('No se encontró el estudiante o paciente seleccionado.');
+      panel.style.display = 'none';
+      return;
+    }
+    const ats = datos.atenciones.filter(a =>
+      String(a.pacienteId) === String(idP) &&
+      String(a.tipo).toLowerCase() === tipoP
+    );
+    ats.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const esEstudiante = tipoP === 'estudiante';
+    const datosPaciente = esEstudiante ? [
+      ['Edad', p.edad],
+      ['Sexo', p.sexo],
+      ['Curso', p.curso],
+      ['Maestro/a', p.maestro],
+      ['Responsable', p.responsable],
+      ['Teléfono de contacto', p.telefono],
+      ['Fecha de registro', p.fechaRegistro ? new Date(p.fechaRegistro).toLocaleDateString('es-ES') : '']
+    ] : [
+      ['Tipo de personal', p.tipo],
+      ['Cargo / puesto', p.cargo],
+      ['Área / departamento', p.area],
+      ['Teléfono', p.telefono]
+    ];
+    html = `
+      <h3>Reporte médico individual - ${escaparHTML(p.nombre)}</h3>
+      <p><strong>Fecha de emisión:</strong> ${new Date().toLocaleDateString('es-ES')}</p>
+      <h4 style="margin:18px 0 8px; color:#1e88e5;">Datos del ${esEstudiante ? 'estudiante' : 'paciente'}</h4>
+      <table class="reporte-datos">
+        <tbody>
+          <tr><th>Nombre completo</th><td>${escaparHTML(p.nombre || 'No registrado')}</td></tr>
+          <tr><th>Tipo</th><td>${esEstudiante ? 'Estudiante' : 'Personal'}</td></tr>
+          ${datosPaciente.map(([etiqueta, valor]) => `
+            <tr><th>${escaparHTML(etiqueta)}</th><td>${escaparHTML(valor || 'No registrado')}</td></tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <h4 style="margin:22px 0 8px; color:#1e88e5;">Condición médica y antecedentes</h4>
+      <table class="reporte-datos">
+        <tbody>
+          <tr><th>Alergias conocidas</th><td>${escaparHTML(p.alergias || 'No registradas')}</td></tr>
+          <tr><th>Condiciones médicas / observaciones</th><td>${escaparHTML(p.observaciones || 'No registradas')}</td></tr>
+        </tbody>
+      </table>
+      <h4 style="margin:22px 0 8px; color:#1e88e5;">Historial médico (${ats.length} atención(es))</h4>
+      <p>Historial completo de atenciones registradas</p>
+      ${ats.length ? ats.map(a => `
+        <div class="historial-item">
+          <div class="fecha"><strong>Fecha y hora:</strong> ${escaparHTML(new Date(a.fecha).toLocaleString('es-ES'))}</div>
+          <div style="margin-top:6px;"><strong>Motivo:</strong> ${escaparHTML(a.motivo || 'No registrado')}</div>
+          <div style="margin-top:6px;"><strong>Signos vitales:</strong>
+            ${[
+              a.pa && `Presión arterial: ${a.pa} mmHg`,
+              a.fc && `Frecuencia cardiaca: ${a.fc} lpm`,
+              a.fr && `Frecuencia respiratoria: ${a.fr} rpm`,
+              a.temp && `Temperatura: ${a.temp} °C`,
+              a.sat && `Saturación O₂: ${a.sat}%`
+            ].filter(Boolean).map(escaparHTML).join(' | ') || 'No registrados'}
+          </div>
+          <div style="margin-top:6px;"><strong>Medicamentos administrados:</strong>
+            ${a.medicamentos && a.medicamentos.length
+              ? a.medicamentos.map(m => `${escaparHTML(m.nombre)} (${escaparHTML(m.cantidad)} unidad(es))`).join(', ')
+              : 'Ninguno'}
+          </div>
+          <div style="margin-top:6px;"><strong>Procedimiento / indicaciones:</strong> ${escaparHTML(a.procedimiento || 'No registrado')}</div>
+          <div style="margin-top:6px;"><strong>Registrado por:</strong> ${escaparHTML(a.registradoPor || 'No registrado')}</div>
+        </div>
+      `).join('') : '<p>No hay atenciones médicas registradas para este período.</p>'}
+    `;
+  }
+  html = html.replace('<h3>', '<h3 class="reporte-titulo">');
+  contenido.innerHTML = `
+    ${encabezadoReporteInstitucional(escuela)}
+    ${html}
+    <div class="pie-reporte">Emitido el ${new Date().toLocaleString('es-ES')}</div>
+  `;
+}
+
+function imprimirReporte() {
+  const panel = document.getElementById('panelReporte');
+  if (panel.style.display === 'none' || !document.getElementById('contenidoReporte').innerHTML.trim()) {
+    alert('Genere un reporte antes de imprimirlo o guardarlo como PDF.');
+    return;
+  }
+  const alturaDisponibleImpresion = 1020;
+  const alturaActual = panel.scrollHeight || panel.offsetHeight;
+  const escala = alturaDisponibleImpresion / Math.max(alturaActual, 1);
+  const escalaAjustada = Math.max(0.78, Math.min(1.5, escala));
+  panel.style.zoom = escalaAjustada.toFixed(3);
+  const tituloOriginal = document.title;
+  const tituloReporte = document.querySelector('#contenidoReporte h3');
+  if (tituloReporte) document.title = tituloReporte.textContent;
+  const restaurarReporte = () => {
+    panel.style.zoom = '';
+    document.title = tituloOriginal;
+  };
+  window.addEventListener('afterprint', restaurarReporte, { once: true });
+  window.print();
+  window.setTimeout(restaurarReporte, 1000);
+}
+
+function exportarCSV() {
+  const tipo = document.getElementById('tipoReporte')?.value || 'atenciones';
+  let csv = '';
+  if (tipo === 'atenciones') {
+    csv = 'Fecha,Paciente,Tipo,Motivo,PA,FC,FR,Temp,Sat,Medicamentos,Procedimiento\n';
+    datos.atenciones.forEach(a => {
+      csv += `"${new Date(a.fecha).toLocaleString('es-ES')}","${a.pacienteNombre}","${a.tipo}","${a.motivo}","${a.pa || ''}","${a.fc || ''}","${a.fr || ''}","${a.temp || ''}","${a.sat || ''}","${a.medicamentos ? a.medicamentos.map(m => m.nombre + ' (' + m.cantidad + ')').join('; ') : ''}","${a.procedimiento || ''}"\n`;
+    });
+  } else if (tipo === 'estudiantes') {
+    csv = 'Nombre,Edad,Sexo,Curso,Maestro,Responsable,Telefono,Alergias\n';
+    datos.estudiantes.forEach(e => {
+      csv += `"${e.nombre}","${e.edad}","${e.sexo}","${e.curso}","${e.maestro || ''}","${e.responsable || ''}","${e.telefono || ''}","${e.alergias || ''}"\n`;
+    });
+  } else if (tipo === 'personal') {
+    csv = 'Nombre,Tipo,Cargo,Area,Telefono,Alergias\n';
+    datos.personal.forEach(p => {
+      csv += `"${p.nombre}","${p.tipo}","${p.cargo || ''}","${p.area || ''}","${p.telefono || ''}","${p.alergias || ''}"\n`;
+    });
+  } else if (tipo === 'medicamentos') {
+    csv = 'Medicamento,Stock,DosisDiaria,Acumulado,ConsumidoHoy\n';
+    datos.medicamentos.forEach(m => {
+      csv += `"${m.nombre}",${m.stock},${m.dosisDiaria},${m.acumulado},${m.consumidoHoy}\n`;
+    });
+  }
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `reporte_${tipo}_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+}
+
+// ============ CONFIGURACIÓN ============
+function cargarConfiguracion() {
+  document.getElementById('cfg_escuela').value = datos.config.escuela || 'Escuela';
+  document.getElementById('cfg_enfermero').value = datos.config.enfermero || '';
+  document.getElementById('cfg_emergencia').value = datos.config.emergencia || '';
+  const div = document.getElementById('configMeds');
+  div.innerHTML = datos.medicamentos.map((m, i) => `
+    <div class="form-grid" style="margin-bottom:10px; align-items:end;">
+      <div class="form-group">
+        <label>${m.nombre}</label>
+        <input type="number" value="${m.dosisDiaria}" data-cfg-idx="${i}" min="1" class="cfg-dosis-input">
+      </div>
+      <div class="form-group">
+        <label>Stock Actual</label>
+        <input type="number" value="${m.stock}" data-cfg-stock-idx="${i}" min="0" class="cfg-stock-input">
+      </div>
+    </div>
+  `).join('');
+}
+
+function guardarConfiguracion() {
+  if (!exigirPermisoEdicion('configuracion')) return;
+  datos.config.escuela = document.getElementById('cfg_escuela').value;
+  datos.config.enfermero = document.getElementById('cfg_enfermero').value;
+  datos.config.emergencia = document.getElementById('cfg_emergencia').value;
+  document.querySelectorAll('.cfg-dosis-input').forEach(input => {
+    const idx = parseInt(input.dataset.cfgIdx);
+    datos.medicamentos[idx].dosisDiaria = parseInt(input.value) || 5;
+  });
+  document.querySelectorAll('.cfg-stock-input').forEach(input => {
+    const idx = parseInt(input.dataset.cfgStockIdx);
+    datos.medicamentos[idx].stock = parseInt(input.value) || 0;
+  });
+  guardarDatos(datos);
+  alert('✅ Configuración guardada');
+}
+
+function respaldarDatos() {
+  const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `respaldo_enfermeria_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+}
+
+function restaurarDatos(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (confirm('¿Restaurar datos? Esto reemplazará toda la información actual.')) {
+        datos = data;
+        guardarDatos(datos);
+        alert('✅ Datos restaurados correctamente');
+        location.reload();
+      }
+    } catch (err) {
+      alert('❌ Archivo inválido');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function borrarTodo() {
+  if (!exigirPermisoEdicion('configuracion')) return;
+  if (!confirm('⚠️ ¿Está seguro? Esto borrará TODOS los datos permanentemente.')) return;
+  if (!confirm('⚠️ ÚLTIMA ADVERTENCIA: Esta acción no se puede deshacer.')) return;
+  borrarTodosLosRegistros();
+}
+
+function borrarTodosLosRegistros() {
+  if (!usuarioSesion || !usuarioSesion.admin) {
+    alert('Solo el administrador puede eliminar todos los registros.');
+    return;
+  }
+  if (!confirm('⚠️ ¿Eliminar todos los registros de estudiantes, personal, atenciones, medicamentos y reposiciones?')) return;
+  if (!confirm('⚠️ Esta acción no se puede deshacer. ¿Confirmar eliminación total?')) return;
+
+  datos.estudiantes = [];
+  datos.personal = [];
+  datos.atenciones = [];
+  datos.historialConsumo = [];
+  datos.reposiciones = [];
+  datos.medicamentos = JSON.parse(JSON.stringify(MEDICAMENTOS_INICIALES));
+  datos.ultimoReset = '';
+  guardarDatos(datos);
+
+  if (supabaseClient) {
+    Promise.all([
+      supabaseClient.from('attention_medications').delete().not('id', 'is', null),
+      supabaseClient.from('attentions').delete().not('id', 'is', null),
+      supabaseClient.from('students').delete().not('id', 'is', null),
+      supabaseClient.from('staff').delete().not('id', 'is', null),
+      supabaseClient.from('medication_replenishments').delete().not('id', 'is', null),
+      supabaseClient.from('consumption_history').delete().not('id', 'is', null)
+    ]).catch(error => console.error('Error eliminando registros de Supabase:', error));
+  }
+
+  renderEstudiantes();
+  actualizarCursos();
+  renderPersonal();
+  renderAtenciones();
+  actualizarDashboard();
+  cargarConfiguracion();
+
+  alert('✅ Todos los registros operativos fueron eliminados.');
+}
+
+// ============ MODALES ============
+function cerrarModal(id) {
+  document.getElementById(id).classList.remove('activo');
+}
+
+// ============ INICIALIZACIÓN ============
+window.onload = function() {
+  limpiarFormularioUsuario();
+  renderUsuarios();
+  verificarConexionSupabase().then(conectado => {
+    const estado = document.getElementById('estadoSupabase');
+    if (!estado) return;
+    estado.className = `estado-supabase ${conectado ? 'conectado' : 'desconectado'}`;
+    estado.textContent = conectado ? 'Supabase: conectado' : 'Supabase: sin conexión';
+  });
+  restaurarSesion().then(restaurada => {
+    if (!restaurada) {
+      document.getElementById('loginOverlay').style.display = 'flex';
+      return;
+    }
+    verificarResetDiario();
+    actualizarFecha();
+    renderEstudiantes();
+    actualizarCursos();
+    renderPersonal();
+    renderAtenciones();
+    actualizarDashboard();
+    setInterval(actualizarFecha, 60000);
+  });
+};
+</script>
+
+</body>
+</html>
