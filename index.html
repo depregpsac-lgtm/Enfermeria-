@@ -937,18 +937,28 @@ function cargarDatos() {
 
 function guardarDatos(datos) {
   if (supabaseClient && usuarioSesion) {
-    sincronizarDatosConSupabase(datos).catch(error => {
+    sincronizarDatosEnCola(datos).catch(error => {
       console.error('Error sincronizando con Supabase:', error);
       alert(`Error guardando en Supabase: ${error.message || 'Error de permisos o conexión'}`);
     });
   }
 }
 
+let colaSincronizacionDatos = Promise.resolve();
+
+function sincronizarDatosEnCola(datos) {
+  const sincronizacion = colaSincronizacionDatos.then(() =>
+    sincronizarDatosConSupabase(datos)
+  );
+  colaSincronizacionDatos = sincronizacion.catch(() => {});
+  return sincronizacion;
+}
+
 async function guardarDatosConfirmado(datos) {
   if (!supabaseClient || !usuarioSesion) {
     throw new Error('No hay una sesión activa para guardar los cambios.');
   }
-  await sincronizarDatosConSupabase(datos);
+  await sincronizarDatosEnCola(datos);
 }
 
 async function eliminarRegistroSupabase(tabla, id) {
@@ -1034,13 +1044,22 @@ async function cargarDatosDesdeSupabase() {
   if (!datos.medicamentos.length) {
     datos.medicamentos = JSON.parse(JSON.stringify(MEDICAMENTOS_INICIALES));
   }
-  const medicamentosPorAtencion = new Map(
-    (medicamentosAtencion.data || []).map(item => [item.attention_id, item])
+  atencionesConMedicamentosSincronizados = new Set(
+    (medicamentosAtencion.data || []).map(item => String(item.attention_id))
   );
+  const medicamentosPorAtencion = new Map();
+  (medicamentosAtencion.data || []).forEach(item => {
+    const idAtencion = String(item.attention_id);
+    if (!medicamentosPorAtencion.has(idAtencion)) {
+      medicamentosPorAtencion.set(idAtencion, []);
+    }
+    medicamentosPorAtencion.get(idAtencion).push({
+      nombre: item.medication_name,
+      cantidad: item.quantity
+    });
+  });
   datos.atenciones = (atenciones.data || []).map(item => {
-    const medicamentosRelacionados = (medicamentosAtencion.data || [])
-      .filter(med => String(med.attention_id) === String(item.id))
-      .map(med => ({ nombre: med.medication_name, cantidad: med.quantity }));
+    const medicamentosRelacionados = medicamentosPorAtencion.get(String(item.id)) || [];
     return {
       id: String(item.id),
       pacienteId: String(item.patient_type === 'estudiante' ? item.student_id : item.staff_id),
@@ -1103,9 +1122,10 @@ async function sincronizarDatosConSupabase(datosActuales) {
       const { error } = await supabaseClient.from('students').upsert(filasExistentes);
       if (error) throw error;
     }
-    const filasNuevas = datosActuales.estudiantes.filter(item => !filasExistentes.some(fila =>
-      String(fila.id) === String(item.id)
-    ));
+    const idsExistentes = new Set(filasExistentes.map(fila => String(fila.id)));
+    const filasNuevas = datosActuales.estudiantes.filter(item =>
+      !idsExistentes.has(String(item.id))
+    );
     if (filasNuevas.length) {
       const { data, error } = await supabaseClient.from('students').insert(
         filasNuevas.map(item => ({
@@ -1145,9 +1165,10 @@ async function sincronizarDatosConSupabase(datosActuales) {
       const { error } = await supabaseClient.from('staff').upsert(filasExistentes);
       if (error) throw error;
     }
-    const filasNuevas = datosActuales.personal.filter(item => !filasExistentes.some(fila =>
-      String(fila.id) === String(item.id)
-    ));
+    const idsExistentes = new Set(filasExistentes.map(fila => String(fila.id)));
+    const filasNuevas = datosActuales.personal.filter(item =>
+      !idsExistentes.has(String(item.id))
+    );
     if (filasNuevas.length) {
       const { data, error } = await supabaseClient.from('staff').insert(
         filasNuevas.map(item => ({
@@ -1183,9 +1204,10 @@ async function sincronizarDatosConSupabase(datosActuales) {
       const { error } = await supabaseClient.from('medications').upsert(filasExistentes);
       if (error) throw error;
     }
-    const filasNuevas = datosActuales.medicamentos.filter(item => !filasExistentes.some(fila =>
-      String(fila.id) === String(item.id)
-    ));
+    const idsExistentes = new Set(filasExistentes.map(fila => String(fila.id)));
+    const filasNuevas = datosActuales.medicamentos.filter(item =>
+      !idsExistentes.has(String(item.id))
+    );
     if (filasNuevas.length) {
       const { data, error } = await supabaseClient.from('medications').insert(
         filasNuevas.map(item => ({
@@ -1225,9 +1247,10 @@ async function sincronizarDatosConSupabase(datosActuales) {
       const { error } = await supabaseClient.from('attentions').upsert(filasExistentes);
       if (error) throw error;
     }
-    const filasNuevas = datosActuales.atenciones.filter(item => !filasExistentes.some(fila =>
-      String(fila.id) === String(item.id)
-    ));
+    const idsExistentes = new Set(filasExistentes.map(fila => String(fila.id)));
+    const filasNuevas = datosActuales.atenciones.filter(item =>
+      !idsExistentes.has(String(item.id))
+    );
     if (filasNuevas.length) {
       const { data, error } = await supabaseClient.from('attentions').insert(
         filasNuevas.map(item => ({
@@ -1252,15 +1275,22 @@ async function sincronizarDatosConSupabase(datosActuales) {
     }
 
     const relaciones = [];
+    const idsConRelacionesNuevas = new Set();
     datosActuales.atenciones.forEach(item => {
-      (item.medicamentos || []).forEach(med => relaciones.push({
-        attention_id: String(item.id),
+      const idAtencion = String(item.id);
+      if (atencionesConMedicamentosSincronizados.has(idAtencion)) return;
+      const medicamentos = item.medicamentos || [];
+      if (medicamentos.length) idsConRelacionesNuevas.add(idAtencion);
+      medicamentos.forEach(med => relaciones.push({
+        attention_id: idAtencion,
         medication_name: med.nombre,
         quantity: Number(med.cantidad) || 1
       }));
     });
     if (relaciones.length) {
-      await supabaseClient.from('attention_medications').upsert(relaciones);
+      const { error } = await supabaseClient.from('attention_medications').insert(relaciones);
+      if (error) throw error;
+      idsConRelacionesNuevas.forEach(id => atencionesConMedicamentosSincronizados.add(id));
     }
   }
   if (datosActuales.reposiciones.length) {
@@ -1278,30 +1308,60 @@ async function sincronizarDatosConSupabase(datosActuales) {
       const { error } = await supabaseClient.from('medication_replenishments').upsert(filasExistentes);
       if (error) throw error;
     }
-    const filasNuevas = datosActuales.reposiciones.filter(item => !filasExistentes.some(fila =>
-      String(fila.id) === String(item.id)
-    ));
+    const idsExistentes = new Set(filasExistentes.map(fila => String(fila.id)));
+    const filasNuevas = datosActuales.reposiciones.filter(item =>
+      !idsExistentes.has(String(item.id))
+    );
     if (filasNuevas.length) {
-      const { error } = await supabaseClient.from('medication_replenishments').insert(
+      const { data, error } = await supabaseClient.from('medication_replenishments').insert(
         filasNuevas.map(item => ({
           medication_name: item.medicamento,
           quantity: Number(item.cantidad) || 1,
           observations: item.observaciones || null,
           replenished_at: item.fecha || new Date().toISOString()
         }))
-      );
+      ).select('id');
       if (error) throw error;
+      (data || []).forEach((fila, indice) => {
+        const local = filasNuevas[indice];
+        if (local) local.id = String(fila.id);
+      });
     }
   }
   if (datosActuales.historialConsumo.length) {
-    const filas = datosActuales.historialConsumo.map(item => ({
+    const filasExistentes = datosActuales.historialConsumo.filter(item =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
+      || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
+    ).map(item => ({
+      id: String(item.id),
       medication_name: item.nombre,
       consumed: Number(item.consumido) || 0,
       accumulated: Number(item.acumulado) || 0,
       consumed_at: item.fecha
     }));
-    const { error } = await supabaseClient.from('consumption_history').upsert(filas);
-    if (error) throw error;
+    if (filasExistentes.length) {
+      const { error } = await supabaseClient.from('consumption_history').upsert(filasExistentes);
+      if (error) throw error;
+    }
+    const idsExistentes = new Set(filasExistentes.map(fila => String(fila.id)));
+    const filasNuevas = datosActuales.historialConsumo.filter(item =>
+      !idsExistentes.has(String(item.id))
+    );
+    if (filasNuevas.length) {
+      const { data, error } = await supabaseClient.from('consumption_history').insert(
+        filasNuevas.map(item => ({
+          medication_name: item.nombre,
+          consumed: Number(item.consumido) || 0,
+          accumulated: Number(item.acumulado) || 0,
+          consumed_at: item.fecha
+        }))
+      ).select('id');
+      if (error) throw error;
+      (data || []).forEach((fila, indice) => {
+        const local = filasNuevas[indice];
+        if (local) local.id = String(fila.id);
+      });
+    }
   }
   if (datosActuales.config) {
     const configuracion = {
@@ -1310,27 +1370,15 @@ async function sincronizarDatosConSupabase(datosActuales) {
       nurse_name: datosActuales.config.enfermero || '',
       emergency_phone: datosActuales.config.emergencia || ''
     };
-    const { error: errorActualizacion } = await supabaseClient
+    const { error } = await supabaseClient
       .from('institution_settings')
-      .update(configuracion)
-      .eq('id', 1);
-    if (errorActualizacion) throw errorActualizacion;
-
-    const { data: existeConfiguracion } = await supabaseClient
-      .from('institution_settings')
-      .select('id')
-      .eq('id', 1)
-      .maybeSingle();
-    if (!existeConfiguracion) {
-      const { error: errorInsercion } = await supabaseClient
-        .from('institution_settings')
-        .insert(configuracion);
-      if (errorInsercion) throw errorInsercion;
-    }
+      .upsert(configuracion);
+    if (error) throw error;
   }
 }
 
 let datos = cargarDatos();
+let atencionesConMedicamentosSincronizados = new Set();
 
 // ============ USUARIOS Y PERMISOS ============
 const USUARIOS_INICIALES = [{
@@ -1451,11 +1499,6 @@ async function iniciarSesion(event) {
           aplicarPermisosSesion();
           try {
             await cargarDatosDesdeSupabase();
-            renderEstudiantes();
-            actualizarCursos();
-            renderPersonal();
-            renderAtenciones();
-            actualizarDashboard();
             cargarConfiguracion();
           } catch (error) {
             console.error('Error cargando datos de Supabase:', error);
@@ -2104,9 +2147,7 @@ function cancelarEdicionEstudiante() {
 
 function renderEstudiantes() {
   const tbody = document.getElementById('cuerpoEstudiantes');
-  tbody.innerHTML = '';
-  datos.estudiantes.forEach(e => {
-    tbody.innerHTML += `
+  tbody.innerHTML = datos.estudiantes.map(e => `
       <tr>
         <td><strong>${e.nombre}</strong></td>
         <td>${e.edad}</td>
@@ -2120,8 +2161,7 @@ function renderEstudiantes() {
           <button class="btn btn-danger btn-sm" onclick="eliminarEstudiante(${argumentoIdHTML(e.id)})">🗑️</button>
         </td>
       </tr>
-    `;
-  });
+    `).join('');
   if (datos.estudiantes.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">No hay estudiantes registrados</td></tr>';
   }
@@ -2141,8 +2181,8 @@ function filtrarEstudiantes() {
 function actualizarCursos() {
   const select = document.getElementById('filtroCurso');
   const cursos = [...new Set(datos.estudiantes.map(e => e.curso))];
-  select.innerHTML = '<option value="">Todos los cursos</option>';
-  cursos.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
+  select.innerHTML = '<option value="">Todos los cursos</option>' +
+    cursos.map(c => `<option value="${c}">${c}</option>`).join('');
 }
 
 function verFichaEstudiante(id) {
@@ -2280,9 +2320,7 @@ function cancelarEdicionPersonal() {
 
 function renderPersonal() {
   const tbody = document.getElementById('cuerpoPersonal');
-  tbody.innerHTML = '';
-  datos.personal.forEach(p => {
-    tbody.innerHTML += `
+  tbody.innerHTML = datos.personal.map(p => `
       <tr>
         <td><strong>${p.nombre}</strong></td>
         <td><span class="badge badge-verde">${p.tipo}</span></td>
@@ -2295,8 +2333,7 @@ function renderPersonal() {
           <button class="btn btn-danger btn-sm" onclick="eliminarPersonal(${argumentoIdHTML(p.id)})">🗑️</button>
         </td>
       </tr>
-    `;
-  });
+    `).join('');
   if (datos.personal.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#999; padding:20px;">No hay personal registrado</td></tr>';
   }
@@ -2381,12 +2418,11 @@ async function eliminarPersonal(id) {
 function renderMedicamentos() {
   verificarResetDiario();
   const grid = document.getElementById('gridMedicamentos');
-  grid.innerHTML = '';
-  datos.medicamentos.forEach((m, i) => {
+  grid.innerHTML = datos.medicamentos.map((m, i) => {
     const disponible = m.dosisDiaria + m.acumulado;
     const porcentaje = Math.min(100, (m.stock / 200) * 100);
     const claseBarra = porcentaje < 20 ? 'bajo' : porcentaje < 50 ? 'medio' : '';
-    grid.innerHTML += `
+    return `
       <div class="med-card">
         <h4>💊 ${m.nombre}</h4>
         <div class="med-info"><span>Stock total:</span> <strong>${m.stock}</strong></div>
@@ -2402,7 +2438,7 @@ function renderMedicamentos() {
         </div>
       </div>
     `;
-  });
+  }).join('');
   renderConsumoDiario();
 }
 
@@ -2602,11 +2638,11 @@ function cargarPacientesAtencion() {
   const tipo = document.getElementById('at_tipo').value;
   const select = document.getElementById('at_paciente');
   const lista = tipo === 'estudiante' ? datos.estudiantes : datos.personal;
-  select.innerHTML = '<option value="">Seleccionar paciente</option>';
-  lista.forEach(p => {
+  select.innerHTML = '<option value="">Seleccionar paciente</option>' +
+    lista.map(p => {
     const info = tipo === 'estudiante' ? `(${p.curso})` : `(${p.tipo})`;
-    select.innerHTML += `<option value="${p.id}">${p.nombre} ${info}</option>`;
-  });
+    return `<option value="${p.id}">${p.nombre} ${info}</option>`;
+  }).join('');
   renderMedicamentosAtencion();
   const ahora = new Date();
   ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
@@ -2807,15 +2843,15 @@ function actualizarDashboard() {
 function cargarPacientesReporte() {
   const dataList = document.getElementById('listaPacientesReporte');
   if (!dataList) return;
-  dataList.innerHTML = '';
-  datos.estudiantes.forEach(estudiante => {
+  dataList.innerHTML = datos.estudiantes.map(estudiante => {
     const nombre = String(estudiante.nombre || '').trim();
-    if (nombre) dataList.innerHTML += `<option value="${escaparHTML(nombre)}" data-referencia="est-${estudiante.id}" label="Estudiante"></option>`;
-  });
-  datos.personal.forEach(miembro => {
+    if (!nombre) return '';
+    return `<option value="${escaparHTML(nombre)}" data-referencia="est-${estudiante.id}" label="Estudiante"></option>`;
+  }).join('') + datos.personal.map(miembro => {
     const nombre = String(miembro.nombre || '').trim();
-    if (nombre) dataList.innerHTML += `<option value="${escaparHTML(nombre)}" data-referencia="per-${miembro.id}" label="Personal"></option>`;
-  });
+    if (!nombre) return '';
+    return `<option value="${escaparHTML(nombre)}" data-referencia="per-${miembro.id}" label="Personal"></option>`;
+  }).join('');
 }
 
 function actualizarFormularioReportes() {
