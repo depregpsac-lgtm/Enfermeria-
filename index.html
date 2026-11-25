@@ -1102,7 +1102,7 @@ async function cargarDatosDesdeSupabase() {
 async function sincronizarDatosConSupabase(datosActuales) {
   if (!supabaseClient) throw new Error('Supabase no está configurado.');
 
-  if (datosActuales.estudiantes.length) {
+  if (datosActuales.estudiantes.length && tienePermiso('estudiantes', 'editar')) {
     const filasExistentes = datosActuales.estudiantes.filter(item =>
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
       || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
@@ -1147,7 +1147,7 @@ async function sincronizarDatosConSupabase(datosActuales) {
       });
     }
   }
-  if (datosActuales.personal.length) {
+  if (datosActuales.personal.length && tienePermiso('personal', 'editar')) {
     const filasExistentes = datosActuales.personal.filter(item =>
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
       || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
@@ -1188,7 +1188,7 @@ async function sincronizarDatosConSupabase(datosActuales) {
       });
     }
   }
-  if (datosActuales.medicamentos.length) {
+  if (datosActuales.medicamentos.length && tienePermiso('medicamentos', 'editar')) {
     const filasExistentes = datosActuales.medicamentos.filter(item =>
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
       || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
@@ -1225,7 +1225,7 @@ async function sincronizarDatosConSupabase(datosActuales) {
       });
     }
   }
-  if (datosActuales.atenciones.length) {
+  if (datosActuales.atenciones.length && tienePermiso('atenciones', 'editar')) {
     const filasExistentes = datosActuales.atenciones.filter(item =>
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
       || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
@@ -1293,7 +1293,7 @@ async function sincronizarDatosConSupabase(datosActuales) {
       idsConRelacionesNuevas.forEach(id => atencionesConMedicamentosSincronizados.add(id));
     }
   }
-  if (datosActuales.reposiciones.length) {
+  if (datosActuales.reposiciones.length && tienePermiso('medicamentos', 'editar')) {
     const filasExistentes = datosActuales.reposiciones.filter(item =>
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
       || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
@@ -1328,7 +1328,7 @@ async function sincronizarDatosConSupabase(datosActuales) {
       });
     }
   }
-  if (datosActuales.historialConsumo.length) {
+  if (datosActuales.historialConsumo.length && tienePermiso('medicamentos', 'editar')) {
     const filasExistentes = datosActuales.historialConsumo.filter(item =>
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(item.id))
       || (/^\d+$/.test(String(item.id)) && String(item.id).length < 13)
@@ -1363,7 +1363,7 @@ async function sincronizarDatosConSupabase(datosActuales) {
       });
     }
   }
-  if (datosActuales.config) {
+  if (datosActuales.config && tienePermiso('configuracion', 'editar')) {
     const configuracion = {
       id: 1,
       school_name: datosActuales.config.escuela || 'Escuela',
@@ -1466,17 +1466,19 @@ async function iniciarSesion(event) {
       const { data: authData, error: authError } =
         await supabaseClient.auth.signInWithPassword({ email: correo, password: clave });
       if (!authError && authData?.user) {
-        const { data: perfil } = await supabaseClient
+        const { data: perfil, error: perfilError } = await supabaseClient
           .from('profiles')
           .select('id,full_name,email,is_admin,is_active')
           .eq('id', authData.user.id)
           .maybeSingle();
+        if (perfilError) throw perfilError;
 
         if (perfil?.is_active !== false) {
-          const { data: permisosDB } = await supabaseClient
+          const { data: permisosDB, error: permisosError } = await supabaseClient
             .from('page_permissions')
             .select('page,can_view,can_edit')
             .eq('user_id', authData.user.id);
+          if (permisosError) throw permisosError;
 
           const permisos = permisosPorDefecto();
           (permisosDB || []).forEach(permiso => {
@@ -1509,9 +1511,14 @@ async function iniciarSesion(event) {
       }
     } catch (error) {
       console.warn('El inicio de sesión en Supabase no estuvo disponible:', error);
+      const mensajeError = document.getElementById('loginError');
+      mensajeError.textContent = `No se pudieron cargar el perfil o los permisos: ${error.message || 'error de conexión'}`;
+      mensajeError.style.display = 'block';
+      return;
     }
   }
 
+  document.getElementById('loginError').textContent = 'Correo o contraseña incorrectos.';
   document.getElementById('loginError').style.display = 'block';
 }
 
@@ -1528,7 +1535,8 @@ async function cerrarSesion() {
 function tienePermiso(pagina, accion = 'ver') {
   if (!usuarioSesion) return false;
   if (usuarioSesion.admin) return true;
-  return Boolean(usuarioSesion.permisos?.[pagina]?.[accion]);
+  const permisos = usuarioSesion.permisos?.[pagina];
+  return Boolean(permisos?.[accion] || (accion === 'ver' && permisos?.editar));
 }
 
 function exigirPermisoEdicion(pagina) {
@@ -1584,16 +1592,18 @@ async function restaurarSesion() {
       const { data: authData } = await supabaseClient.auth.getSession();
       const authUser = authData?.session?.user;
       if (authUser) {
-        const { data: perfil } = await supabaseClient
+        const { data: perfil, error: perfilError } = await supabaseClient
           .from('profiles')
           .select('id,full_name,email,is_admin,is_active')
           .eq('id', authUser.id)
           .maybeSingle();
+        if (perfilError) throw perfilError;
         if (perfil?.is_active !== false) {
-          const { data: permisosDB } = await supabaseClient
+          const { data: permisosDB, error: permisosError } = await supabaseClient
             .from('page_permissions')
             .select('page,can_view,can_edit')
             .eq('user_id', authUser.id);
+          if (permisosError) throw permisosError;
           const permisos = permisosPorDefecto();
           (permisosDB || []).forEach(permiso => {
             permisos[permiso.page] = {
@@ -1621,6 +1631,9 @@ async function restaurarSesion() {
       }
     } catch (error) {
       console.warn('No se pudo restaurar la sesión de Supabase:', error);
+      const mensajeError = document.getElementById('loginError');
+      mensajeError.textContent = `No se pudieron restaurar el perfil o los permisos: ${error.message || 'error de conexión'}`;
+      mensajeError.style.display = 'block';
     }
   }
 
@@ -1634,14 +1647,27 @@ function cargarPermisosFormulario(permisos) {
     .filter(pagina => pagina.id !== 'usuarios')
     .map(pagina => {
       const permiso = permisos?.[pagina.id] || { ver: false, editar: false };
+      const puedeEditar = Boolean(permiso.editar);
+      const puedeVer = Boolean(permiso.ver || puedeEditar);
       return `
         <div class="permiso-fila">
           <label>${pagina.nombre}</label>
-          <span class="permiso-opcion"><input type="checkbox" data-permiso="${pagina.id}" data-accion="ver" ${permiso.ver ? 'checked' : ''}> Ver</span>
-          <span class="permiso-opcion"><input type="checkbox" data-permiso="${pagina.id}" data-accion="editar" ${permiso.editar ? 'checked' : ''}> Editar</span>
+          <span class="permiso-opcion"><input type="checkbox" data-permiso="${pagina.id}" data-accion="ver" onchange="actualizarPermisoPagina(this)" ${puedeVer ? 'checked' : ''}> Ver</span>
+          <span class="permiso-opcion"><input type="checkbox" data-permiso="${pagina.id}" data-accion="editar" onchange="actualizarPermisoPagina(this)" ${puedeEditar ? 'checked' : ''}> Editar</span>
         </div>
       `;
     }).join('');
+}
+
+function actualizarPermisoPagina(input) {
+  const fila = input.closest('.permiso-fila');
+  const permisoVer = fila.querySelector('[data-accion="ver"]');
+  const permisoEditar = fila.querySelector('[data-accion="editar"]');
+  if (input.dataset.accion === 'editar' && permisoEditar.checked) {
+    permisoVer.checked = true;
+  } else if (input.dataset.accion === 'ver' && !permisoVer.checked) {
+    permisoEditar.checked = false;
+  }
 }
 
 function obtenerPermisosFormulario() {
@@ -1651,6 +1677,9 @@ function obtenerPermisosFormulario() {
     const accion = input.dataset.accion;
     if (!permisos[pagina]) permisos[pagina] = { ver: false, editar: false };
     permisos[pagina][accion] = input.checked;
+  });
+  PAGINAS_SISTEMA.forEach(pagina => {
+    if (permisos[pagina.id].editar) permisos[pagina.id].ver = true;
   });
   permisos.usuarios = { ver: false, editar: false };
   return permisos;
@@ -1695,7 +1724,6 @@ async function guardarUsuario(event) {
       alert('No se pudo actualizar el perfil: ' + perfilError.message);
       return;
     }
-    await supabaseClient.from('page_permissions').delete().eq('user_id', id);
     const filasPermisos = PAGINAS_SISTEMA
       .filter(pagina => pagina.id !== 'usuarios')
       .map(pagina => ({
@@ -1707,7 +1735,7 @@ async function guardarUsuario(event) {
     if (filasPermisos.length) {
       const { error: permisosError } = await supabaseClient
         .from('page_permissions')
-        .insert(filasPermisos);
+        .upsert(filasPermisos, { onConflict: 'user_id,page' });
       if (permisosError) {
         alert('No se pudieron guardar los permisos: ' + permisosError.message);
         return;
@@ -1755,7 +1783,13 @@ async function guardarUsuario(event) {
         can_edit: Boolean(permisos[pagina.id]?.editar)
       }));
     if (filasPermisos.length) {
-      await supabaseClient.from('page_permissions').insert(filasPermisos);
+        const { error: permisosError } = await supabaseClient
+          .from('page_permissions')
+          .insert(filasPermisos);
+        if (permisosError) {
+          alert('No se pudieron guardar los permisos: ' + permisosError.message);
+          return;
+        }
     }
     await supabaseClient.auth.signOut();
   }
@@ -2690,6 +2724,11 @@ function guardarAtencion(e) {
     }
   });
 
+  if (medicamentos.length && !tienePermiso('medicamentos', 'editar')) {
+    alert('Se necesita permiso de edición de Medicamentos para administrar medicamentos en una atención.');
+    return;
+  }
+
   // Validar y descontar stock
   for (const med of medicamentos) {
     const m = datos.medicamentos[med.idx];
@@ -3183,15 +3222,16 @@ function cargarConfiguracion() {
   document.getElementById('cfg_enfermero').value = datos.config.enfermero || '';
   document.getElementById('cfg_emergencia').value = datos.config.emergencia || '';
   const div = document.getElementById('configMeds');
+  const puedeEditarMedicamentos = tienePermiso('medicamentos', 'editar');
   div.innerHTML = datos.medicamentos.map((m, i) => `
     <div class="form-grid" style="margin-bottom:10px; align-items:end;">
       <div class="form-group">
         <label>${m.nombre}</label>
-        <input type="number" value="${m.dosisDiaria}" data-cfg-idx="${i}" min="1" class="cfg-dosis-input">
+        <input type="number" value="${m.dosisDiaria}" data-cfg-idx="${i}" min="1" class="cfg-dosis-input" ${puedeEditarMedicamentos ? '' : 'disabled'}>
       </div>
       <div class="form-group">
         <label>Stock Actual</label>
-        <input type="number" value="${m.stock}" data-cfg-stock-idx="${i}" min="0" class="cfg-stock-input">
+        <input type="number" value="${m.stock}" data-cfg-stock-idx="${i}" min="0" class="cfg-stock-input" ${puedeEditarMedicamentos ? '' : 'disabled'}>
       </div>
     </div>
   `).join('');
@@ -3202,14 +3242,16 @@ function guardarConfiguracion() {
   datos.config.escuela = document.getElementById('cfg_escuela').value;
   datos.config.enfermero = document.getElementById('cfg_enfermero').value;
   datos.config.emergencia = document.getElementById('cfg_emergencia').value;
-  document.querySelectorAll('.cfg-dosis-input').forEach(input => {
-    const idx = parseInt(input.dataset.cfgIdx);
-    datos.medicamentos[idx].dosisDiaria = parseInt(input.value) || 5;
-  });
-  document.querySelectorAll('.cfg-stock-input').forEach(input => {
-    const idx = parseInt(input.dataset.cfgStockIdx);
-    datos.medicamentos[idx].stock = parseInt(input.value) || 0;
-  });
+  if (tienePermiso('medicamentos', 'editar')) {
+    document.querySelectorAll('.cfg-dosis-input').forEach(input => {
+      const idx = parseInt(input.dataset.cfgIdx);
+      datos.medicamentos[idx].dosisDiaria = parseInt(input.value) || 5;
+    });
+    document.querySelectorAll('.cfg-stock-input').forEach(input => {
+      const idx = parseInt(input.dataset.cfgStockIdx);
+      datos.medicamentos[idx].stock = parseInt(input.value) || 0;
+    });
+  }
   guardarDatos(datos);
   alert('✅ Configuración guardada');
 }
